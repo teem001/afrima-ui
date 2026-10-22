@@ -1,0 +1,182 @@
+export type Role = "CONSUMER" | "MERCHANT";
+
+export interface User {
+  id: string;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  role: Role;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresInSeconds: number;
+  user: User;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest extends LoginRequest {
+  fullName: string;
+  phone?: string;
+  role: Role;
+}
+
+export interface NearbyOffer {
+  storeId: string;
+  storeName: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  openNow: boolean;
+  productId: string;
+  sku: string;
+  productName: string;
+  quantity: number;
+  unitPriceKobo: number;
+  unitPrice: string;
+  currency: string;
+  distanceMeters: number;
+}
+
+export interface SearchResponse {
+  query: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  resultCount: number;
+  minPriceKobo: number | null;
+  maxPriceKobo: number | null;
+  minPrice: string | null;
+  maxPrice: string | null;
+  offers: NearbyOffer[];
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  aliases: string[];
+}
+
+export interface Store {
+  id: string;
+  merchantId: string;
+  name: string;
+  description: string | null;
+  address: string;
+  latitude: number;
+  longitude: number;
+  openAt: string;
+  closeAt: string;
+  deliveryRadiusM: number;
+  active: boolean;
+  openNow: boolean;
+}
+
+export interface InventoryItem {
+  id: string;
+  storeId: string;
+  productId: string;
+  quantity: number;
+  unitPriceKobo: number;
+  unitPrice: string;
+  currency: string;
+}
+
+export interface UpsertInventoryRequest {
+  productId: string;
+  quantity: number;
+  unitPriceKobo: number;
+}
+
+export type OrderStatus = "PLACED" | "ACCEPTED" | "CANCELLED";
+
+export interface OrderLine {
+  productId: string;
+  quantity: number;
+  unitPriceKobo: number;
+  unitPrice: string;
+}
+
+export interface Order {
+  id: string;
+  consumerId: string;
+  storeId: string;
+  status: OrderStatus;
+  totalKobo: number;
+  total: string;
+  currency: string;
+  ledgerHash: string;
+  createdAt: string;
+  items: OrderLine[];
+}
+
+export interface PlaceOrderRequest {
+  storeId: string;
+  items: { productId: string; quantity: number }[];
+}
+
+export interface StockChanged {
+  storeId: string;
+  productId: string;
+  quantity: number;
+  unitPriceKobo: number;
+}
+
+export interface AiStatus {
+  engine: string;
+  configured: boolean;
+  model: string | null;
+}
+
+export interface AiClientContext {
+  screen?: string;
+  searchQuery?: string;
+  locationLabel?: string;
+  radiusMeters?: number;
+  storeName?: string;
+  cart?: {
+    storeName?: string;
+    items: { productName: string; quantity: number; unitPrice: string }[];
+  };
+}
+
+export interface AiChatRequest {
+  conversationId?: string;
+  message: string;
+  latitude?: number;
+  longitude?: number;
+  context?: AiClientContext;
+}
+
+export interface ToolExecution {
+  tool: string;
+  arguments: Record<string, unknown>;
+  result: { success: boolean; message?: string; errorCode?: string; data?: unknown };
+}
+
+export interface AiChatResponse {
+  conversationId: string;
+  reply: string;
+  toolCalls: ToolExecution[];
+}
+
+export type AiProgress =
+  | { requestId: string; phase: "conversation"; conversationId: string }
+  | { requestId: string; phase: "thinking"; round: number }
+  | { requestId: string; phase: "tool_started"; tool: string }
+  | { requestId: string; phase: "tool_finished"; tool: string; success: boolean; message?: string };
+
+export interface ErrorResponse {
+  code: string;
+  message: string;
+  status: number;
+  timestamp: string;
+  details: string[];
+}
