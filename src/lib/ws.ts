@@ -30,7 +30,8 @@ interface Pending {
   sent: boolean;
   resolve: (data: unknown) => void;
   reject: (error: ApiError) => void;
-  timer: ReturnType<typeof setTimeout>;
+  timer: ReturnType<typeof setTimeout> | null;
+  timeoutMs: number;
   onProgress?: (data: unknown) => void;
 }
 
@@ -46,6 +47,8 @@ type ServerMessage =
 
 const PING_INTERVAL_MS = 25_000;
 const DEFAULT_TIMEOUT_MS = 20_000;
+/** Cold-starting the backend container can take a while; queued requests get longer before giving up. */
+const QUEUE_TIMEOUT_MS = 90_000;
 const MAX_BACKOFF_MS = 10_000;
 
 function socketUrl(): string {
@@ -86,10 +89,17 @@ class RealtimeClient {
     const id = `${Date.now().toString(36)}-${(this.sequence++).toString(36)}`;
     const frame = JSON.stringify(payload === undefined ? { id, type } : { id, type, payload });
     return new Promise<T>((resolve, reject) => {
+      // While queued (socket still connecting / backend cold-starting) use a generous deadline; the real
+      // request timeout only starts once the frame is actually sent — see send().
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new ApiError(0, { code: "TIMEOUT", message: "AfriSmart took too long to answer. Try again." }));
-      }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+        reject(
+          new ApiError(0, {
+            code: "TIMEOUT",
+            message: "Couldn't reach AfriSmart. Check your connection and try again.",
+          }),
+        );
+      }, QUEUE_TIMEOUT_MS);
       this.pending.set(id, {
         type,
         frame,
@@ -97,6 +107,7 @@ class RealtimeClient {
         resolve: resolve as (data: unknown) => void,
         reject,
         timer,
+        timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         onProgress: options.onProgress,
       });
       if (this.ready && this.socket?.readyState === WebSocket.OPEN) {
@@ -111,6 +122,13 @@ class RealtimeClient {
     const entry = this.pending.get(id);
     if (!entry) return;
     entry.sent = true;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      this.pending.delete(id);
+      entry.reject(
+        new ApiError(0, { code: "TIMEOUT", message: "AfriSmart took too long to answer. Try again." }),
+      );
+    }, entry.timeoutMs);
     socket.send(entry.frame);
   }
 
@@ -156,6 +174,7 @@ class RealtimeClient {
           type: "auth.resume",
           frame,
           sent: true,
+          timeoutMs: DEFAULT_TIMEOUT_MS,
           resolve: () => resolve(),
           reject: (error) => {
             if (error.status === 401) useAuth.getState().logout();
@@ -194,7 +213,7 @@ class RealtimeClient {
     const entry = this.pending.get(message.id);
     if (!entry) return;
     this.pending.delete(message.id);
-    clearTimeout(entry.timer);
+    if (entry.timer) clearTimeout(entry.timer);
     if (message.ok) {
       entry.resolve(message.data ?? null);
       return;
@@ -215,7 +234,7 @@ class RealtimeClient {
   private failInFlight() {
     for (const [id, entry] of this.pending) {
       if (!entry.sent) continue;
-      clearTimeout(entry.timer);
+      if (entry.timer) clearTimeout(entry.timer);
       entry.reject(connectionLost());
       this.pending.delete(id);
     }
