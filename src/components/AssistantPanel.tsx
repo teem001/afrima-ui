@@ -21,6 +21,7 @@ const TOOL_LABELS: Record<string, string> = {
   GET_LOW_STOCK_ITEMS: "Checking what's running low",
   GET_INCOMING_ORDERS: "Checking incoming orders",
   UPDATE_STOCK: "Updating stock",
+  GET_MY_WALLET: "Checking your wallet",
 };
 
 const toolLabel = (tool: string) => TOOL_LABELS[tool] ?? tool.toLowerCase().replaceAll("_", " ");

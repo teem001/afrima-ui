@@ -95,7 +95,7 @@ export interface UpsertInventoryRequest {
   unitPriceKobo: number;
 }
 
-export type OrderStatus = "PLACED" | "ACCEPTED" | "CANCELLED";
+export type OrderStatus = "PLACED" | "ACCEPTED" | "FULFILLED" | "CANCELLED";
 
 export interface OrderLine {
   productId: string;
@@ -120,6 +120,123 @@ export interface Order {
 export interface PlaceOrderRequest {
   storeId: string;
   items: { productId: string; quantity: number }[];
+}
+
+export interface Wallet {
+  ownerId: string;
+  balanceKobo: number;
+  balance: string;
+  currency: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: string;
+  referenceId: string | null;
+  description: string | null;
+  amountKobo: number;
+  amount: string;
+  createdAt: string;
+}
+
+export interface OrderPayment {
+  orderId: string;
+  status: "UNPAID" | "IN_ESCROW" | "RELEASED" | "REFUNDED";
+  amountKobo: number;
+  amount: string;
+  commissionKobo: number;
+  commission: string;
+  netKobo: number;
+  net: string;
+}
+
+export interface Payout {
+  id: string;
+  amountKobo: number;
+  amount: string;
+  status: string;
+  bankLabel: string;
+  createdAt: string;
+}
+
+export interface MerchantPayments {
+  walletBalanceKobo: number;
+  walletBalance: string;
+  inEscrowKobo: number;
+  inEscrow: string;
+  releasedGrossKobo: number;
+  releasedGross: string;
+  commissionKobo: number;
+  commission: string;
+  paidOutKobo: number;
+  paidOut: string;
+  payouts: Payout[];
+}
+
+export interface VerifyResult {
+  orderId: string;
+  ledgerHash: string;
+  hashMatches: boolean;
+  anchored: boolean;
+  merkleRoot: string | null;
+  txReference: string | null;
+  anchorStatus: string | null;
+  proofValid: boolean;
+}
+
+export interface StockTwin {
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPriceKobo: number;
+  unitPrice: string;
+  unitsSold7d: number;
+  velocityPerDay: number;
+  daysToStockout: number | null;
+  lowStock: boolean;
+}
+
+export interface ShopTwin {
+  storeId: string;
+  storeName: string;
+  address: string;
+  openNow: boolean;
+  stock: StockTwin[];
+  suggestions: { type: string; message: string }[];
+  money: MerchantPayments;
+}
+
+export interface CustomerTwin {
+  userId: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  wallet: Wallet;
+  escrow: { inEscrowKobo: number; inEscrow: string; heldOrders: number };
+  ordersCount: number;
+  totalSpentKobo: number;
+  totalSpent: string;
+  recentOrders: Order[];
+}
+
+export interface Simulation {
+  productId: string;
+  productName: string;
+  currentQuantity: number;
+  restockQty: number;
+  currentPriceKobo: number;
+  currentPrice: string;
+  simulatedPriceKobo: number;
+  simulatedPrice: string;
+  velocityPerDay: number;
+  daysToStockoutNow: number | null;
+  daysToStockoutAfterRestock: number | null;
+  projectedRevenue7dKobo: number;
+  projectedRevenue7d: string;
+  simulatedRevenue7dKobo: number;
+  simulatedRevenue7d: string;
+  note: string;
 }
 
 export interface StockChanged {

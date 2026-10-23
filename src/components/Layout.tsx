@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { LogOut, MapPin, ShoppingBag, Store } from "lucide-react";
+import { Fingerprint, LogOut, MapPin, ShoppingBag, Store, Wallet as WalletIcon } from "lucide-react";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 import { useAuth } from "@/store/auth";
 import { useCart } from "@/store/cart";
@@ -44,6 +44,18 @@ export function Layout() {
                 My orders
               </NavLink>
             )}
+            {user && (
+              <NavLink to="/wallet" className={navClass}>
+                <span className="inline-flex items-center gap-1.5">
+                  <WalletIcon className="size-4" /> Wallet
+                </span>
+              </NavLink>
+            )}
+            <NavLink to="/verify" className={navClass}>
+              <span className="inline-flex items-center gap-1.5">
+                <Fingerprint className="size-4" /> Verify
+              </span>
+            </NavLink>
             {user?.role === "MERCHANT" && (
               <NavLink to="/merchant" className={navClass}>
                 <span className="inline-flex items-center gap-1.5">

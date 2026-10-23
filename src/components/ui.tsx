@@ -81,7 +81,7 @@ export function Badge({ tone = "stone", children }: { tone?: Tone; children: Rea
   );
 }
 
-const statusTone: Record<OrderStatus, Tone> = { PLACED: "amber", ACCEPTED: "green", CANCELLED: "red" };
+const statusTone: Record<OrderStatus, Tone> = { PLACED: "amber", ACCEPTED: "blue", FULFILLED: "green", CANCELLED: "red" };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {
   return <Badge tone={statusTone[status]}>{status.charAt(0) + status.slice(1).toLowerCase()}</Badge>;

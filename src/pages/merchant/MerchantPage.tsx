@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Boxes, ClipboardList, Sparkles, Store } from "lucide-react";
+import { Boxes, ClipboardList, Landmark, ScanEye, Sparkles, Store } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { Badge, Card, EmptyState, ErrorBanner, Spinner } from "@/components/ui";
 import { MerchantOrders } from "@/pages/merchant/MerchantOrders";
 import { InventoryTable } from "@/pages/merchant/InventoryTable";
+import { PayoutsPanel } from "@/pages/merchant/PayoutsPanel";
+import { TwinPanel } from "@/pages/merchant/TwinPanel";
 
-type Tab = "orders" | "inventory" | "assistant";
+type Tab = "orders" | "inventory" | "payouts" | "twin" | "assistant";
 
 export function MerchantPage() {
   const [tab, setTab] = useState<Tab>("orders");
@@ -61,6 +63,8 @@ export function MerchantPage() {
           [
             ["orders", "Orders", ClipboardList],
             ["inventory", "Inventory", Boxes],
+            ["payouts", "Payouts", Landmark],
+            ["twin", "Twin", ScanEye],
             ["assistant", "Assistant", Sparkles],
           ] as const
         ).map(([value, label, Icon]) => (
@@ -78,12 +82,14 @@ export function MerchantPage() {
 
       {tab === "orders" && <MerchantOrders storeId={active.id} />}
       {tab === "inventory" && <InventoryTable storeId={active.id} />}
+      {tab === "payouts" && <PayoutsPanel />}
+      {tab === "twin" && <TwinPanel storeId={active.id} />}
       <div className={tab === "assistant" ? "max-w-2xl" : "hidden"}>
         <AssistantPanel
           screen="merchant"
           storeName={active.name}
           title="Shop assistant"
-          suggestions={["What's running low?", "Any new orders?", "How many pens do I have left?"]}
+          suggestions={["What's running low?", "Any new orders?", "What's in my wallet?"]}
         />
       </div>
     </div>

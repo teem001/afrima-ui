@@ -139,6 +139,7 @@ export function Cart() {
 
   const total = cartTotalKobo(lines);
   const stockError = place.error instanceof ApiError && place.error.code === "INSUFFICIENT_STOCK";
+  const fundsError = place.error instanceof ApiError && place.error.code === "INSUFFICIENT_FUNDS";
 
   return (
     <Card className="space-y-4 p-4">
@@ -196,6 +197,12 @@ export function Cart() {
         />
       )}
       {stockError && rerouteFor && <Reroute lines={lines} currentStoreId={rerouteFor} />}
+      {fundsError && (
+        <Link to="/wallet" className="block text-center text-sm font-medium text-emerald-800 hover:underline">
+          Add demo funds to your wallet →
+        </Link>
+      )}
+      <p className="text-center text-xs text-stone-500">Paid from your wallet into escrow; released to the shop on fulfilment.</p>
 
       {!user ? (
         <Link

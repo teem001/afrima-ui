@@ -5,16 +5,25 @@ import type {
   AiProgress,
   AiStatus,
   AuthResponse,
+  CustomerTwin,
   InventoryItem,
   LoginRequest,
+  MerchantPayments,
   Order,
+  OrderPayment,
+  Payout,
   PlaceOrderRequest,
   Product,
   RegisterRequest,
   SearchResponse,
+  ShopTwin,
+  Simulation,
   Store,
   UpsertInventoryRequest,
   User,
+  VerifyResult,
+  Wallet,
+  WalletTransaction,
 } from "@/lib/types";
 
 export { ApiError };
@@ -44,6 +53,22 @@ export const api = {
   order: (orderId: string) => call<Order>("orders.get", { orderId }),
   merchantOrders: () => call<Order[]>("orders.merchant"),
   acceptOrder: (orderId: string) => call<Order>("orders.accept", { orderId }),
+  fulfilOrder: (orderId: string) => call<Order>("orders.fulfil", { orderId }),
+  cancelOrder: (orderId: string) => call<Order>("orders.cancel", { orderId }),
+  verifyOrder: (orderId: string) => call<VerifyResult>("verify", { orderId }),
+
+  wallet: () => call<Wallet>("wallet.me"),
+  fundWallet: (amountKobo: number) => call<Wallet>("wallet.fund", { amountKobo }),
+  walletTransactions: () => call<WalletTransaction[]>("wallet.transactions"),
+  orderPayment: (orderId: string) => call<OrderPayment>("payments.order", { orderId }),
+  merchantPayments: () => call<MerchantPayments>("payments.merchantSummary"),
+  requestPayout: (amountKobo: number) => call<Payout>("payouts.request", { amountKobo }),
+  myPayouts: () => call<Payout[]>("payouts.mine"),
+
+  shopTwin: (storeId: string) => call<ShopTwin>("twin.shop", { storeId }),
+  myTwin: () => call<CustomerTwin>("twin.me"),
+  simulate: (body: { storeId: string; productId: string; restockQty?: number; priceChangePercent?: number }) =>
+    call<Simulation>("twin.simulate", body),
 
   aiStatus: () => call<AiStatus>("ai.status"),
   aiChat: (body: AiChatRequest, onProgress?: (progress: AiProgress) => void) =>

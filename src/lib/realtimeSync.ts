@@ -29,9 +29,17 @@ export function useRealtimeSync() {
       }
     };
 
+    const refreshMoney = () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["twin"] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payouts"] });
+    };
+
     const offPlaced = realtime.on("order.placed", (data) => {
       const order = data as Order;
       upsertOrder(order);
+      refreshMoney();
       const me = useAuth.getState().user;
       if (me?.role === "MERCHANT") {
         useToasts.getState().push({
@@ -45,6 +53,7 @@ export function useRealtimeSync() {
     const offUpdated = realtime.on("order.updated", (data) => {
       const order = data as Order;
       upsertOrder(order);
+      refreshMoney();
       if (useAuth.getState().user?.id === order.consumerId && order.status === "ACCEPTED") {
         useToasts.getState().push({
           title: "Order accepted",

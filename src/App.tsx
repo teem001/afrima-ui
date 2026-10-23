@@ -8,6 +8,8 @@ import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { OrderDetailPage } from "@/pages/OrderDetailPage";
+import { WalletPage } from "@/pages/WalletPage";
+import { VerifyPage } from "@/pages/VerifyPage";
 import { MerchantPage } from "@/pages/merchant/MerchantPage";
 
 function Home() {
@@ -23,6 +25,15 @@ export function App() {
         <Route path="cart" element={<CartPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="verify" element={<VerifyPage />} />
+        <Route
+          path="wallet"
+          element={
+            <RequireRole>
+              <WalletPage />
+            </RequireRole>
+          }
+        />
         <Route
           path="orders"
           element={

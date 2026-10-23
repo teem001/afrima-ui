@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Check, CheckCircle2, Copy, ShieldCheck, Wallet as WalletIcon } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { formatDateTime, formatKobo, formatTime } from "@/lib/format";
 import { useLookups } from "@/lib/lookups";
 import { useAuth } from "@/store/auth";
-import { Card, ErrorBanner, Spinner, StatusBadge } from "@/components/ui";
+import { Badge, Button, Card, ErrorBanner, Spinner, StatusBadge } from "@/components/ui";
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -25,16 +25,46 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+const TIMELINE: { label: string; done: (s: string, p: string, anchored: boolean) => boolean }[] = [
+  { label: "Reserved at shop", done: () => true },
+  { label: "Paid into escrow", done: (_s, p) => p === "IN_ESCROW" || p === "RELEASED" },
+  { label: "Accepted", done: (s) => s === "ACCEPTED" || s === "FULFILLED" },
+  { label: "Fulfilled · escrow released", done: (s, p) => s === "FULFILLED" && p === "RELEASED" },
+  { label: "Receipt anchored", done: (_s, _p, anchored) => anchored },
+];
+
 export function OrderDetailPage() {
   const { orderId = "" } = useParams();
   const justPlaced = (useLocation().state as { justPlaced?: boolean } | null)?.justPlaced;
   const role = useAuth((s) => s.user?.role);
   const { productName, store } = useLookups();
+  const queryClient = useQueryClient();
 
   const order = useQuery({
     queryKey: ["orders", orderId],
     queryFn: () => api.order(orderId),
   });
+  const payment = useQuery({
+    queryKey: ["payments", "order", orderId],
+    queryFn: () => api.orderPayment(orderId),
+    enabled: order.isSuccess,
+  });
+  const verify = useQuery({
+    queryKey: ["verify", orderId],
+    queryFn: () => api.verifyOrder(orderId),
+    enabled: order.isSuccess,
+    retry: false,
+  });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["orders", orderId] });
+    queryClient.invalidateQueries({ queryKey: ["payments"] });
+    queryClient.invalidateQueries({ queryKey: ["wallet"] });
+    queryClient.invalidateQueries({ queryKey: ["twin"] });
+    queryClient.invalidateQueries({ queryKey: ["verify", orderId] });
+  };
+  const fulfil = useMutation({ mutationFn: api.fulfilOrder, onSuccess: refresh });
+  const cancel = useMutation({ mutationFn: api.cancelOrder, onSuccess: refresh });
 
   if (order.isPending) return <Spinner />;
   if (order.isError) return <ErrorBanner message={errorMessage(order.error)} />;
@@ -97,6 +127,60 @@ export function OrderDetailPage() {
         </ul>
       </Card>
 
+      <Card className="space-y-3 p-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
+          <WalletIcon className="size-4 text-emerald-700" /> Payment &amp; fulfilment
+        </p>
+        {o.status === "CANCELLED" ? (
+          <p className="text-sm text-stone-600">
+            {payment.data?.status === "REFUNDED"
+              ? "Cancelled — the escrow was refunded to the customer's wallet and the stock put back."
+              : "This order was cancelled."}
+          </p>
+        ) : (
+          <ol className="space-y-2">
+            {TIMELINE.map((step) => {
+              const done = step.done(o.status, payment.data?.status ?? "UNPAID", verify.data?.anchored ?? false);
+              return (
+                <li key={step.label} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={`grid size-5 place-items-center rounded-full ${
+                      done ? "bg-emerald-600 text-white" : "bg-stone-200 text-stone-400"
+                    }`}
+                  >
+                    <Check className="size-3" />
+                  </span>
+                  <span className={done ? "text-stone-800" : "text-stone-400"}>{step.label}</span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {payment.data && payment.data.status !== "UNPAID" && (
+          <p className="text-xs text-stone-500">
+            {formatKobo(payment.data.amountKobo)} {payment.data.status === "IN_ESCROW" && "held in escrow"}
+            {payment.data.status === "RELEASED" &&
+              `released · shop received ${formatKobo(payment.data.netKobo)} after ${formatKobo(payment.data.commissionKobo)} commission`}
+            {payment.data.status === "REFUNDED" && "refunded from escrow"}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {role === "MERCHANT" && o.status === "ACCEPTED" && (
+            <Button loading={fulfil.isPending} onClick={() => fulfil.mutate(o.id)}>
+              Mark fulfilled
+            </Button>
+          )}
+          {(o.status === "PLACED" || o.status === "ACCEPTED") && (
+            <Button variant="ghost" loading={cancel.isPending} onClick={() => cancel.mutate(o.id)}>
+              Cancel order
+            </Button>
+          )}
+          {(fulfil.isError || cancel.isError) && (
+            <ErrorBanner message={errorMessage(fulfil.error ?? cancel.error)} />
+          )}
+        </div>
+      </Card>
+
       <Card className="space-y-2 border-emerald-200 bg-emerald-50/50 p-4">
         <div className="flex items-center justify-between">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-900">
@@ -109,6 +193,14 @@ export function OrderDetailPage() {
           SHA-256 fingerprint of this order's shop, buyer, items, prices and time. Any change to the order produces a
           different hash, so it can be verified later.
         </p>
+        {verify.data?.anchored && (
+          <Badge tone="green">
+            Anchored · {verify.data.txReference} · proof {verify.data.proofValid ? "valid" : "invalid"}
+          </Badge>
+        )}
+        <Link to="/verify" className="block text-xs font-medium text-emerald-800 hover:underline">
+          Verify this receipt →
+        </Link>
       </Card>
     </div>
   );
