@@ -10,6 +10,7 @@ import { useSearchPrefs } from "@/store/searchPrefs";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { Cart } from "@/components/Cart";
 import { LocationPicker } from "@/components/LocationPicker";
+import { MediaThumb } from "@/components/MediaThumb";
 import { OfferMap } from "@/components/OfferMap";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Spinner } from "@/components/ui";
 
@@ -44,11 +45,16 @@ function OfferCard({
     cart.add(offer);
   };
 
+  const media = offer.productImageUrl ?? offer.storeImageUrl;
+
   return (
     <Card
       className={`p-4 transition-shadow ${selected ? "ring-2 ring-emerald-600" : "hover:shadow-md"}`}
     >
       <div className="flex items-start gap-4" onMouseEnter={onSelect}>
+        <span className="size-16 shrink-0 overflow-hidden rounded-xl bg-stone-100 ring-1 ring-stone-200">
+          <MediaThumb url={media} />
+        </span>
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
             {nearest && <Badge tone="blue">Nearest</Badge>}

@@ -5,9 +5,11 @@ import type {
   AiProgress,
   AiStatus,
   AuthResponse,
+  CreateProductRequest,
   CustomerTwin,
   InventoryItem,
   LoginRequest,
+  MediaUpload,
   MerchantPayments,
   Order,
   OrderPayment,
@@ -20,6 +22,7 @@ import type {
   Simulation,
   Store,
   UpsertInventoryRequest,
+  UpsertStoreRequest,
   User,
   VerifyResult,
   Wallet,
@@ -42,11 +45,18 @@ export const api = {
   search: (params: { q: string; lat: number; lng: number; radiusMeters?: number }) => call<SearchResponse>("search", params),
 
   products: () => call<Product[]>("catalog.products"),
+  createProduct: (body: CreateProductRequest) => call<Product>("catalog.products.create", body),
   stores: () => call<Store[]>("stores.list"),
   myStores: () => call<Store[]>("stores.mine"),
+  createStore: (body: UpsertStoreRequest) => call<Store>("stores.create", body),
+  updateStore: (storeId: string, body: UpsertStoreRequest) => call<Store>("stores.update", { storeId, ...body }),
   inventory: (storeId: string) => call<InventoryItem[]>("inventory.list", { storeId }),
   upsertInventory: (storeId: string, body: UpsertInventoryRequest) =>
     call<InventoryItem>("inventory.upsert", { storeId, ...body }),
+  restockInventory: (storeId: string, body: { productId: string; addQuantity: number; unitPriceKobo?: number | null }) =>
+    call<InventoryItem>("inventory.restock", { storeId, ...body }),
+  uploadMedia: (body: { contentType: string; data: string }) =>
+    realtime.request<MediaUpload>("media.upload", body, { timeoutMs: 120_000 }),
 
   placeOrder: (body: PlaceOrderRequest) => call<Order>("orders.place", body),
   myOrders: () => call<Order[]>("orders.mine"),

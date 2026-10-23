@@ -72,7 +72,7 @@ export function WalletPage() {
       {role === "CONSUMER" && twin.data && (
         <Card className="space-y-3 p-4">
           <p className="flex items-center gap-1.5 font-semibold text-stone-900">
-            <ShieldCheck className="size-4 text-emerald-700" /> My digital twin
+            <ShieldCheck className="size-4 text-emerald-700" /> Your activity snapshot
           </p>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>

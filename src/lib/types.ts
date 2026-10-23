@@ -33,9 +33,11 @@ export interface NearbyOffer {
   latitude: number;
   longitude: number;
   openNow: boolean;
+  storeImageUrl: string | null;
   productId: string;
   sku: string;
   productName: string;
+  productImageUrl: string | null;
   quantity: number;
   unitPriceKobo: number;
   unitPrice: string;
@@ -62,6 +64,16 @@ export interface Product {
   name: string;
   description: string | null;
   aliases: string[];
+  imageMediaId: string | null;
+  imageUrl: string | null;
+}
+
+export interface CreateProductRequest {
+  sku?: string | null;
+  name: string;
+  description?: string | null;
+  aliases?: string[];
+  imageMediaId?: string | null;
 }
 
 export interface Store {
@@ -77,6 +89,31 @@ export interface Store {
   deliveryRadiusM: number;
   active: boolean;
   openNow: boolean;
+  imageMediaId: string | null;
+  imageUrl: string | null;
+  phone: string | null;
+  category: string | null;
+}
+
+export interface UpsertStoreRequest {
+  name: string;
+  description?: string | null;
+  address: string;
+  latitude: number;
+  longitude: number;
+  openAt: string;
+  closeAt: string;
+  deliveryRadiusM?: number | null;
+  imageMediaId?: string | null;
+  phone?: string | null;
+  category?: string | null;
+}
+
+export interface MediaUpload {
+  id: string;
+  url: string;
+  contentType: string;
+  byteSize: number;
 }
 
 export interface InventoryItem {
@@ -188,6 +225,7 @@ export interface StockTwin {
   productId: string;
   productName: string;
   sku: string;
+  imageUrl: string | null;
   quantity: number;
   unitPriceKobo: number;
   unitPrice: string;
@@ -197,13 +235,21 @@ export interface StockTwin {
   lowStock: boolean;
 }
 
+export interface ShopSuggestion {
+  type: string;
+  message: string;
+  productId: string | null;
+  suggestedQty: number | null;
+}
+
 export interface ShopTwin {
   storeId: string;
   storeName: string;
   address: string;
   openNow: boolean;
+  imageUrl: string | null;
   stock: StockTwin[];
-  suggestions: { type: string; message: string }[];
+  suggestions: ShopSuggestion[];
   money: MerchantPayments;
 }
 
