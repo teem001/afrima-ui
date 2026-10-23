@@ -31,7 +31,9 @@ export function RegisterPage() {
     <div className="mx-auto max-w-md space-y-6 pt-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
-        <p className="text-sm text-stone-600">Shop smarter across Lagos.</p>
+        <p className="text-sm text-stone-600">
+          Anyone can register — several shoppers and merchants can demo together on separate devices.
+        </p>
       </div>
       <Card className="p-6">
         <form onSubmit={submit} className="space-y-4">
