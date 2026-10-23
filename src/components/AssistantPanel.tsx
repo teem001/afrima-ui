@@ -144,8 +144,8 @@ export function AssistantPanel({
         {
           conversationId: conversation,
           message: text,
-          latitude: screen === "search" ? prefs.lat : undefined,
-          longitude: screen === "search" ? prefs.lng : undefined,
+          latitude: screen === "search" && prefs.lat != null ? prefs.lat : undefined,
+          longitude: screen === "search" && prefs.lng != null ? prefs.lng : undefined,
           context: clientContext(screen, options.searchQuery, storeName),
         },
         onProgress,

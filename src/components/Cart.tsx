@@ -7,7 +7,7 @@ import { formatDistance, formatKobo } from "@/lib/format";
 import type { NearbyOffer } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { cartTotalKobo, useCart, type CartLine } from "@/store/cart";
-import { useSearchPrefs } from "@/store/searchPrefs";
+import { hasSearchLocation, useSearchPrefs } from "@/store/searchPrefs";
 import { Button, Card, EmptyState, ErrorBanner, Spinner } from "@/components/ui";
 
 const REROUTE_RADIUS_M = 20_000;
@@ -28,12 +28,14 @@ function Reroute({ lines, currentStoreId }: { lines: CartLine[]; currentStoreId:
   const add = useCart((s) => s.add);
   const clear = useCart((s) => s.clear);
   const radius = Math.max(radiusMeters, REROUTE_RADIUS_M);
+  const locationReady = hasSearchLocation(lat, lng);
 
   const results = useQueries({
     queries: lines.map((line) => ({
       queryKey: ["search", line.sku, lat, lng, radius],
-      queryFn: () => api.search({ q: line.sku, lat, lng, radiusMeters: radius }),
+      queryFn: () => api.search({ q: line.sku, lat: lat!, lng: lng!, radiusMeters: radius }),
       staleTime: 0,
+      enabled: locationReady,
     })),
   });
 

@@ -6,7 +6,7 @@ import { api, errorMessage } from "@/lib/api";
 import { formatDistance, formatKobo } from "@/lib/format";
 import type { NearbyOffer } from "@/lib/types";
 import { useCart } from "@/store/cart";
-import { useSearchPrefs } from "@/store/searchPrefs";
+import { hasSearchLocation, useSearchPrefs } from "@/store/searchPrefs";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { Cart } from "@/components/Cart";
 import { LocationPicker } from "@/components/LocationPicker";
@@ -102,11 +102,12 @@ export function SearchPage() {
   const [aiRequest, setAiRequest] = useState<{ query: string; nonce: number } | null>(null);
   const [aiOffers, setAiOffers] = useState<NearbyOffer[]>([]);
   const { lat, lng, radiusMeters, label } = useSearchPrefs();
+  const locationReady = hasSearchLocation(lat, lng);
 
   const search = useQuery({
     queryKey: ["search", q, lat, lng, radiusMeters],
-    queryFn: () => api.search({ q, lat, lng, radiusMeters }),
-    enabled: q.length >= 2,
+    queryFn: () => api.search({ q, lat: lat!, lng: lng!, radiusMeters }),
+    enabled: locationReady && q.length >= 2,
   });
 
   const submit = (e: FormEvent) => {
@@ -147,7 +148,9 @@ export function SearchPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
             Find it nearby, in stock.
           </h1>
-          <p className="text-stone-600">Compare prices across Lagos shops and order from the closest one that has it.</p>
+          <p className="text-stone-600">
+            Set your location, then compare prices at nearby shops and order from the closest one that has stock.
+          </p>
         </div>
         <form onSubmit={submit} className="flex gap-2">
           <div className="relative flex-1">
@@ -185,14 +188,21 @@ export function SearchPage() {
             onOffers={setAiOffers}
             suggestions={["Cheapest rice near me?", "Which shop is open now with sachet water?"]}
           />
-          {!q && (
+          {!locationReady && (
+            <Card>
+              <EmptyState icon={<PackageSearch className="size-10" />} title="Set your location first">
+                Type any place above (or use GPS) so we know where “nearby” is.
+              </EmptyState>
+            </Card>
+          )}
+          {locationReady && !q && (
             <Card>
               <EmptyState icon={<PackageSearch className="size-10" />} title="Search for something you need">
                 We'll list shops within {formatDistance(radiusMeters)} of {label} that have it in stock, nearest first.
               </EmptyState>
             </Card>
           )}
-          {q && search.isFetching && !search.data && <Spinner label="Searching nearby shops…" />}
+          {locationReady && q && search.isFetching && !search.data && <Spinner label="Searching nearby shops…" />}
           {search.isError && <ErrorBanner message={errorMessage(search.error)} />}
           {summary && <p className="text-sm text-stone-600">{summary}</p>}
           {search.data && offers.length === 0 && !showAiOffers && (
@@ -233,13 +243,19 @@ export function SearchPage() {
 
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="h-72 overflow-hidden rounded-2xl border border-stone-200 shadow-sm">
-            <OfferMap
-              center={{ lat, lng }}
-              radiusMeters={radiusMeters}
-              offers={mapOffers}
-              selectedStoreId={selectedStoreId}
-              onSelectStore={setSelectedStoreId}
-            />
+            {locationReady ? (
+              <OfferMap
+                center={{ lat: lat as number, lng: lng as number }}
+                radiusMeters={radiusMeters}
+                offers={mapOffers}
+                selectedStoreId={selectedStoreId}
+                onSelectStore={setSelectedStoreId}
+              />
+            ) : (
+              <div className="grid h-full place-items-center bg-stone-50 px-6 text-center text-sm text-stone-500">
+                Map appears after you set a location
+              </div>
+            )}
           </div>
           <Cart />
         </aside>

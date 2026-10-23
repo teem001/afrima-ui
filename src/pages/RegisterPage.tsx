@@ -32,46 +32,42 @@ export function RegisterPage() {
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
         <p className="text-sm text-stone-600">
-          Anyone can register — several shoppers and merchants can demo together on separate devices.
+          Start from scratch — register, set your location, then shop or create a shop. Light data only.
         </p>
       </div>
       <Card className="p-6">
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
-            {ROLES.map(({ value, title, body, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, role: value }))}
-                className={`rounded-xl border p-3 text-left transition-colors ${
-                  form.role === value ? "border-emerald-600 bg-emerald-50" : "border-stone-200 hover:border-stone-300"
-                }`}
-              >
-                <Icon className={`mb-1 size-5 ${form.role === value ? "text-emerald-700" : "text-stone-400"}`} />
-                <p className="text-sm font-medium text-stone-900">{title}</p>
-                <p className="text-xs text-stone-500">{body}</p>
-              </button>
-            ))}
+            {ROLES.map((r) => {
+              const Icon = r.icon;
+              const selected = form.role === r.value;
+              return (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, role: r.value }))}
+                  className={`rounded-xl border p-3 text-left transition ${
+                    selected ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600" : "border-stone-200 hover:border-stone-300"
+                  }`}
+                >
+                  <Icon className={`mb-1 size-5 ${selected ? "text-emerald-800" : "text-stone-500"}`} />
+                  <p className="text-sm font-medium text-stone-900">{r.title}</p>
+                  <p className="text-xs text-stone-500">{r.body}</p>
+                </button>
+              );
+            })}
           </div>
           <Field label="Full name">
-            <Input required maxLength={255} value={form.fullName} onChange={set("fullName")} />
+            <Input required value={form.fullName} onChange={set("fullName")} autoComplete="name" />
           </Field>
           <Field label="Email">
-            <Input type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
+            <Input type="email" required value={form.email} onChange={set("email")} autoComplete="email" />
           </Field>
           <Field label="Phone (optional)">
-            <Input type="tel" maxLength={32} placeholder="0803 000 0000" value={form.phone} onChange={set("phone")} />
+            <Input value={form.phone} onChange={set("phone")} autoComplete="tel" />
           </Field>
           <Field label="Password">
-            <Input
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={72}
-              value={form.password}
-              onChange={set("password")}
-            />
+            <Input type="password" required minLength={8} value={form.password} onChange={set("password")} autoComplete="new-password" />
           </Field>
           {register.isError && <ErrorBanner message={errorMessage(register.error)} />}
           <Button type="submit" className="w-full" loading={register.isPending}>

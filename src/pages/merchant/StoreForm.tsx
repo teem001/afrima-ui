@@ -1,16 +1,12 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Crosshair, MapPin, Store } from "lucide-react";
+import { PlaceAutocomplete } from "@/components/PlaceAutocomplete";
 import { api, errorMessage } from "@/lib/api";
-import { LAGOS_PLACES } from "@/lib/locations";
 import type { Store as StoreType, UpsertStoreRequest } from "@/lib/types";
-import { useSearchPrefs } from "@/store/searchPrefs";
+import { hasSearchLocation, useSearchPrefs } from "@/store/searchPrefs";
 import { ImageUpload } from "@/components/ImageUpload";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
-
-function matchPlace(lat: number, lng: number) {
-  return LAGOS_PLACES.find((p) => Math.abs(p.lat - lat) < 1e-5 && Math.abs(p.lng - lng) < 1e-5) ?? null;
-}
 
 function toRequest(values: {
   name: string;
@@ -49,18 +45,16 @@ export function StoreForm({
 }) {
   const prefs = useSearchPrefs();
   const queryClient = useQueryClient();
-  const initialPlace = existing
-    ? matchPlace(existing.latitude, existing.longitude)
-    : matchPlace(prefs.lat, prefs.lng) ?? LAGOS_PLACES[0];
+  const prefsReady = hasSearchLocation(prefs.lat, prefs.lng);
 
   const [name, setName] = useState(existing?.name ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
-  const [address, setAddress] = useState(existing?.address ?? initialPlace?.label ?? prefs.label);
-  const [latitude, setLatitude] = useState(existing?.latitude ?? initialPlace?.lat ?? prefs.lat);
-  const [longitude, setLongitude] = useState(existing?.longitude ?? initialPlace?.lng ?? prefs.lng);
-  const [locationLabel, setLocationLabel] = useState(
-    existing ? (matchPlace(existing.latitude, existing.longitude)?.label ?? "Custom pin") : (initialPlace?.label ?? prefs.label),
+  const [address, setAddress] = useState(existing?.address ?? "");
+  const [latitude, setLatitude] = useState<number | null>(existing?.latitude ?? (prefsReady ? prefs.lat : null));
+  const [longitude, setLongitude] = useState<number | null>(
+    existing?.longitude ?? (prefsReady ? prefs.lng : null),
   );
+  const [placeQuery, setPlaceQuery] = useState(existing?.address ?? "");
   const [openAt, setOpenAt] = useState((existing?.openAt ?? "08:00:00").slice(0, 5));
   const [closeAt, setCloseAt] = useState((existing?.closeAt ?? "20:00:00").slice(0, 5));
   const [deliveryRadiusM, setDeliveryRadiusM] = useState(String(existing?.deliveryRadiusM ?? 5000));
@@ -71,10 +65,8 @@ export function StoreForm({
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
-  const selectedPlaceId = useMemo(() => matchPlace(latitude, longitude)?.id ?? "custom", [latitude, longitude]);
-
   const applyLocation = (label: string, lat: number, lng: number) => {
-    setLocationLabel(label);
+    setPlaceQuery(label);
     setAddress(label);
     setLatitude(lat);
     setLongitude(lng);
@@ -94,7 +86,7 @@ export function StoreForm({
         setLocating(false);
       },
       () => {
-        setGeoError("Couldn't get GPS — pick an area from the list instead");
+        setGeoError("Couldn't get GPS — type and pick a place instead");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 12_000 },
@@ -103,10 +95,13 @@ export function StoreForm({
 
   const save = useMutation({
     mutationFn: async () => {
+      if (latitude == null || longitude == null) {
+        throw new Error("Pick a place from the suggestions (or use GPS) so the shop has coordinates");
+      }
       const body = toRequest({
         name,
         description,
-        address,
+        address: address || placeQuery,
         latitude,
         longitude,
         openAt,
@@ -140,7 +135,7 @@ export function StoreForm({
             {existing ? "Update your shop" : "Set up your physical shop"}
           </h2>
           <p className="text-sm text-stone-600">
-            Put your real shop on AfriSmart — pick its location so GPS comes from that place.
+            Put your real shop on AfriSmart — type any place worldwide and pick it, or use GPS.
           </p>
         </div>
       </div>
@@ -161,7 +156,7 @@ export function StoreForm({
         />
 
         <Field label="Shop name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} placeholder="Yaba Campus Mart" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={255} placeholder="Your shop name" />
         </Field>
         <Field label="What you sell">
           <Input
@@ -186,47 +181,40 @@ export function StoreForm({
           <p className="flex items-center gap-1.5 text-sm font-medium text-stone-800">
             <MapPin className="size-4 text-emerald-700" /> Shop location
           </p>
-          <p className="text-xs text-stone-500">
-            Choose an area or use GPS — address and coordinates update from that selection.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="min-w-[12rem] flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:outline-none"
-              value={selectedPlaceId}
-              onChange={(e) => {
-                const place = LAGOS_PLACES.find((p) => p.id === e.target.value);
-                if (place) applyLocation(place.label, place.lat, place.lng);
-              }}
-              aria-label="Shop area"
-            >
-              {selectedPlaceId === "custom" && <option value="custom">{locationLabel}</option>}
-              {LAGOS_PLACES.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={useMyLocation}
-              disabled={locating}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 disabled:opacity-60"
-            >
-              <Crosshair className={`size-4 ${locating ? "animate-spin" : ""}`} />
-              {locating ? "Locating…" : "Use my GPS"}
-            </button>
-          </div>
-          <Field label="Address (from location)">
+          <p className="text-xs text-stone-500">Type to search OpenStreetMap, then pick a result — or use GPS.</p>
+          <PlaceAutocomplete
+            value={placeQuery}
+            onChange={(v) => {
+              setPlaceQuery(v);
+              setAddress(v);
+            }}
+            onPick={(place) => applyLocation(place.label, place.lat, place.lng)}
+            placeholder="Type street, area, city…"
+            required
+          />
+          <button
+            type="button"
+            onClick={useMyLocation}
+            disabled={locating}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50 disabled:opacity-60"
+          >
+            <Crosshair className={`size-4 ${locating ? "animate-spin" : ""}`} />
+            {locating ? "Locating…" : "Use my GPS"}
+          </button>
+          <Field label="Address on listing">
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               required
               maxLength={512}
-              placeholder="Filled from the selected location — you can refine the street"
+              placeholder="Refine the street or landmark if needed"
             />
           </Field>
           <p className="font-mono text-xs text-stone-500">
-            GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+            GPS:{" "}
+            {latitude != null && longitude != null
+              ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+              : "pick a place or use GPS"}
           </p>
           {geoError && <p className="text-xs text-red-600">{geoError}</p>}
         </div>
