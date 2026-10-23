@@ -1,14 +1,14 @@
 /** Client-side resize/re-encode so uploads stay small before they hit the API. */
 
 export const IMAGE_MAX_EDGE = 1280;
-export const IMAGE_TARGET_BYTES = 450_000;
+export const IMAGE_TARGET_BYTES = 350_000;
 export const IMAGE_MAX_INPUT_BYTES = 12_000_000;
 
-export const VIDEO_MAX_EDGE = 720;
-export const VIDEO_TARGET_BITS = 750_000;
-export const VIDEO_MAX_DURATION_SEC = 45;
-export const VIDEO_MAX_INPUT_BYTES = 40_000_000;
-export const VIDEO_MAX_OUTPUT_BYTES = 3_500_000;
+export const VIDEO_MAX_EDGE = 640;
+export const VIDEO_TARGET_BITS = 600_000;
+export const VIDEO_MAX_DURATION_SEC = 20;
+export const VIDEO_MAX_INPUT_BYTES = 25_000_000;
+export const VIDEO_MAX_OUTPUT_BYTES = 2_500_000;
 
 export type CompressedMedia = {
   contentType: string;

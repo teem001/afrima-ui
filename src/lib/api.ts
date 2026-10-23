@@ -1,3 +1,5 @@
+import { apiHttpOrigin } from "@/lib/media";
+import { useAuth } from "@/store/auth";
 import { ApiError, realtime } from "@/lib/ws";
 import type {
   AiChatRequest,
@@ -36,6 +38,38 @@ const AI_CHAT_TIMEOUT_MS = 180_000;
 
 const call = <T>(type: string, payload?: unknown) => realtime.request<T>(type, payload);
 
+/** Prefer HTTP for media — large base64 frames used to exceed the 64KB WebSocket limit and drop the socket. */
+async function uploadMediaHttp(body: { contentType: string; data: string }): Promise<MediaUpload> {
+  const token = useAuth.getState().token;
+  if (!token) {
+    throw new ApiError(401, { code: "UNAUTHORIZED", message: "Sign in to upload media" });
+  }
+  const response = await fetch(`${apiHttpOrigin()}/api/v1/media`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  if (!response.ok) {
+    const err = parsed as { code?: string; message?: string; details?: string[] } | null;
+    throw new ApiError(response.status, {
+      code: err?.code ?? "UPLOAD_FAILED",
+      message: err?.message ?? `Upload failed (${response.status})`,
+      details: err?.details ?? [],
+    });
+  }
+  return parsed as MediaUpload;
+}
+
 export const api = {
   login: (body: LoginRequest) => call<AuthResponse>("auth.login", body),
   register: (body: RegisterRequest) => call<AuthResponse>("auth.register", body),
@@ -55,8 +89,7 @@ export const api = {
     call<InventoryItem>("inventory.upsert", { storeId, ...body }),
   restockInventory: (storeId: string, body: { productId: string; addQuantity: number; unitPriceKobo?: number | null }) =>
     call<InventoryItem>("inventory.restock", { storeId, ...body }),
-  uploadMedia: (body: { contentType: string; data: string }) =>
-    realtime.request<MediaUpload>("media.upload", body, { timeoutMs: 120_000 }),
+  uploadMedia: (body: { contentType: string; data: string }) => uploadMediaHttp(body),
 
   placeOrder: (body: PlaceOrderRequest) => call<Order>("orders.place", body),
   myOrders: () => call<Order[]>("orders.mine"),

@@ -11,7 +11,7 @@ export function ImageUpload({
   valueUrl,
   onUploaded,
   onCleared,
-  hint = "Photos and videos are compressed automatically · photo ~450 KB · video under ~3.5 MB / 45s",
+  hint = "Photos and videos are compressed automatically · photo ~350 KB · video under ~2.5 MB / 20s",
   acceptVideo = true,
 }: {
   label?: string;
