@@ -24,6 +24,7 @@ import type {
   ProductReview,
   ProductReviewSummary,
   RegisterRequest,
+  ImageSearchResponse,
   SearchResponse,
   ShopperProfile,
   ShopTwin,
@@ -93,6 +94,15 @@ export const api = {
     categoryId?: string | null;
     categorySlug?: string | null;
   }) => call<SearchResponse>("search", params),
+
+  searchByImage: (params: {
+    mediaId: string;
+    lat: number;
+    lng: number;
+    radiusMeters?: number | null;
+    page?: number;
+    pageSize?: number;
+  }) => call<ImageSearchResponse>("search.byImage", params),
 
   products: () => call<Product[]>("catalog.products"),
   categories: () => call<ProductCategory[]>("catalog.categories"),

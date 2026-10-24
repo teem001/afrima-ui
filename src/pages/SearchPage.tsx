@@ -1,10 +1,11 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronLeft, ChevronRight, Clock, PackageSearch, Plus, Search } from "lucide-react";
+import { Camera, Check, ChevronLeft, ChevronRight, Clock, PackageSearch, Plus, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { compressMediaFile } from "@/lib/compressMedia";
 import { formatDistance, formatKobo } from "@/lib/format";
-import type { NearbyOffer } from "@/lib/types";
+import type { ImageSearchResponse, NearbyOffer } from "@/lib/types";
 import { useCart } from "@/store/cart";
 import { hasSearchLocation, useSearchPrefs } from "@/store/searchPrefs";
 import { AssistantPanel } from "@/components/AssistantPanel";
@@ -104,12 +105,16 @@ export function SearchPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [aiRequest, setAiRequest] = useState<{ query: string; nonce: number } | null>(null);
   const [aiOffers, setAiOffers] = useState<NearbyOffer[]>([]);
+  const [imageResult, setImageResult] = useState<ImageSearchResponse | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const { lat, lng, radiusMeters, label } = useSearchPrefs();
   const locationReady = hasSearchLocation(lat, lng);
 
   const categories = useQuery({ queryKey: ["catalog", "categories"], queryFn: api.categories, staleTime: 300_000 });
 
-  const searchEnabled = locationReady && (q.length >= 2 || !!categorySlug);
+  const searchEnabled = locationReady && (q.length >= 2 || !!categorySlug) && !imageResult;
 
   const search = useQuery({
     queryKey: ["search", q, categorySlug, lat, lng, page, PAGE_SIZE],
@@ -139,42 +144,87 @@ export function SearchPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const value = draft.trim();
+    setImageResult(null);
     setSearchParams({ q: value, page: 1, category: null });
     if (value) askAssistant(value);
   };
 
   const runSuggestion = (s: string) => {
     setDraft(s);
+    setImageResult(null);
     setSearchParams({ q: s, page: 1, category: null });
     askAssistant(s);
   };
 
   const runCategory = (slug: string, name: string) => {
     setDraft("");
+    setImageResult(null);
     setSearchParams({ q: "", page: 1, category: slug });
     askAssistant(`Suggest something in ${name}`);
   };
 
   const askAssistant = (query: string) => setAiRequest((prev) => ({ query, nonce: (prev?.nonce ?? 0) + 1 }));
 
-  const offers = search.data?.offers ?? [];
-  const totalCount = search.data?.totalCount ?? 0;
-  const totalPages = search.data?.totalPages ?? 1;
-  const showAiOffers = !!search.data && totalCount === 0 && aiOffers.length > 0;
+  const activeSearch = imageResult ?? search.data;
+  const offers = activeSearch?.offers ?? [];
+  const totalCount = activeSearch?.totalCount ?? 0;
+  const totalPages = activeSearch?.totalPages ?? 1;
+  const showAiOffers = !!activeSearch && totalCount === 0 && aiOffers.length > 0;
   const mapOffers = showAiOffers ? aiOffers : offers;
-  const cheapestKobo = search.data?.minPriceKobo ?? null;
+  const cheapestKobo = activeSearch?.minPriceKobo ?? null;
   const nearestKey = page === 1 && offers[0] ? `${offers[0].storeId}:${offers[0].productId}` : null;
 
   const summary = useMemo(() => {
-    if (!search.data || totalCount === 0) return null;
+    if (!activeSearch || totalCount === 0) return null;
     const range =
-      search.data.minPriceKobo === search.data.maxPriceKobo
-        ? formatKobo(search.data.minPriceKobo!)
-        : `${formatKobo(search.data.minPriceKobo!)} – ${formatKobo(search.data.maxPriceKobo!)}`;
-    const from = (search.data.page - 1) * search.data.pageSize + 1;
+      activeSearch.minPriceKobo === activeSearch.maxPriceKobo
+        ? formatKobo(activeSearch.minPriceKobo!)
+        : `${formatKobo(activeSearch.minPriceKobo!)} – ${formatKobo(activeSearch.maxPriceKobo!)}`;
+    const from = (activeSearch.page - 1) * activeSearch.pageSize + 1;
     const to = from + offers.length - 1;
-    return `${totalCount} in-stock offer${totalCount === 1 ? "" : "s"} from any shop · ${range} · showing ${from}–${to}`;
-  }, [search.data, offers.length, totalCount]);
+    const vision =
+      imageResult?.visionDescription != null
+        ? `Photo match: “${imageResult.visionDescription}” · `
+        : "";
+    return `${vision}${totalCount} in-stock offer${totalCount === 1 ? "" : "s"} from any shop · ${range} · showing ${from}–${to}`;
+  }, [activeSearch, offers.length, totalCount, imageResult]);
+
+  const onImagePick = async (file: File | undefined) => {
+    if (!file) return;
+    if (!locationReady || lat == null || lng == null) {
+      setImageError("Set your location first so we can rank shops by distance.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setImageError("Pick a product photo");
+      return;
+    }
+    setImageError(null);
+    setImageBusy(true);
+    setImageResult(null);
+    try {
+      const compressed = await compressMediaFile(file);
+      const uploaded = await api.uploadMedia({
+        contentType: compressed.contentType,
+        data: compressed.dataUrl,
+      });
+      const result = await api.searchByImage({
+        mediaId: uploaded.id,
+        lat,
+        lng,
+        page: 1,
+        pageSize: PAGE_SIZE,
+      });
+      setImageResult(result);
+      setDraft(result.query);
+      setParams({ q: result.query });
+      askAssistant(`I uploaded a photo that looks like: ${result.visionDescription}. Help me buy the best match.`);
+    } catch (e) {
+      setImageError(errorMessage(e));
+    } finally {
+      setImageBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -193,14 +243,50 @@ export function SearchPage() {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="What do you need? e.g. pack of pens"
-              className="w-full rounded-xl border border-stone-300 bg-white py-3 pr-3 pl-10 text-base shadow-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 focus:outline-none"
+              placeholder="What do you need? e.g. pack of pens — or search by photo"
+              className="w-full rounded-xl border border-stone-300 bg-white py-3 pr-12 pl-10 text-base shadow-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 focus:outline-none"
+            />
+            <button
+              type="button"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-emerald-800 disabled:opacity-50"
+              title="Search by photo"
+              aria-label="Search by photo"
+              disabled={imageBusy || !locationReady}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <Camera className="size-5" />
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                void onImagePick(file);
+              }}
             />
           </div>
-          <Button type="submit" className="rounded-xl px-5" disabled={draft.trim().length < 2}>
+          <Button type="submit" className="rounded-xl px-5" disabled={draft.trim().length < 2 || imageBusy}>
             Search
           </Button>
         </form>
+        {imageBusy && <Spinner label="Looking up your photo in nearby shops…" />}
+        {imageError && <ErrorBanner message={imageError} />}
+        {imageResult && (
+          <p className="text-sm text-stone-600">
+            Photo → {imageResult.queries.join(" · ")}
+            <button
+              type="button"
+              className="ml-2 font-medium text-emerald-800 hover:underline"
+              onClick={() => setImageResult(null)}
+            >
+              Clear photo search
+            </button>
+          </p>
+        )}
         <LocationPicker />
         <div className="flex flex-wrap gap-2">
           {SUGGESTIONS.map((s) => (
@@ -264,17 +350,21 @@ export function SearchPage() {
           {locationReady && searchEnabled && search.isFetching && !search.data && (
             <Spinner label="Searching all shops…" />
           )}
-          {search.isError && <ErrorBanner message={errorMessage(search.error)} />}
+          {search.isError && !imageResult && <ErrorBanner message={errorMessage(search.error)} />}
           {summary && <p className="text-sm text-stone-600">{summary}</p>}
-          {search.data && totalCount === 0 && !showAiOffers && (
+          {activeSearch && totalCount === 0 && !showAiOffers && (
             <Card>
               <EmptyState
                 icon={<PackageSearch className="size-10" />}
                 title={
-                  q ? `No shop has “${q}” in stock` : `No in-stock items in this category yet`
+                  imageResult
+                    ? `No shop match for “${imageResult.query}”`
+                    : q
+                      ? `No shop has “${q}” in stock`
+                      : `No in-stock items in this category yet`
                 }
               >
-                Try a different name or category.
+                Try a different photo, name, or category.
               </EmptyState>
             </Card>
           )}
@@ -305,7 +395,7 @@ export function SearchPage() {
               onSelect={() => setSelectedStoreId(offer.storeId)}
             />
           ))}
-          {totalCount > PAGE_SIZE && (
+          {!imageResult && totalCount > PAGE_SIZE && (
             <div className="flex items-center justify-between gap-3 pt-2">
               <Button
                 variant="secondary"
@@ -316,12 +406,12 @@ export function SearchPage() {
                 <ChevronLeft className="size-4" /> Previous
               </Button>
               <p className="text-sm text-stone-600">
-                Page {search.data?.page ?? page} of {totalPages}
+                Page {activeSearch?.page ?? page} of {totalPages}
               </p>
               <Button
                 variant="secondary"
                 className="px-3 py-1.5"
-                disabled={!search.data?.hasMore || search.isFetching}
+                disabled={!activeSearch?.hasMore || search.isFetching}
                 onClick={() => setSearchParams({ page: page + 1 })}
               >
                 Next <ChevronRight className="size-4" />

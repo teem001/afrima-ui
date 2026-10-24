@@ -48,6 +48,12 @@ export interface NearbyOffer {
   categoryName?: string | null;
 }
 
+export interface ImageSearchResponse extends SearchResponse {
+  queries: string[];
+  visionDescription: string;
+  mediaId: string;
+}
+
 export interface SearchResponse {
   query: string;
   categoryId?: string | null;

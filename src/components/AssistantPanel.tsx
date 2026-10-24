@@ -15,6 +15,7 @@ const TOOL_LABELS: Record<string, string> = {
   COMPARE_PRICES: "Comparing prices",
   FIND_ALTERNATIVE_STORES: "Finding other shops",
   GET_STORE_DETAILS: "Checking the shop",
+  SEARCH_BY_IMAGE: "Matching your photo",
   LIST_CATEGORIES: "Listing categories",
   SEARCH_BY_CATEGORY: "Browsing a category",
   PLACE_ORDER: "Placing the order",
