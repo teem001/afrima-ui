@@ -22,7 +22,7 @@ export default defineConfig({
   },
   server: {
     // 5174 avoids clash with other local Vite apps that often take 5173.
-    port: 5174,
+    port: 5600,
     strictPort: true,
     proxy: {
       "/ws": {
