@@ -34,7 +34,7 @@ export function OrdersPage() {
                   <StatusBadge status={order.status} />
                 </div>
                 <p className="truncate text-sm text-stone-600">
-                  {order.items.map((i) => `${i.quantity}× ${productName(i.productId)}`).join(", ")}
+                  {(order.items ?? []).map((i) => `${i.quantity}× ${productName(i.productId)}`).join(", ")}
                 </p>
                 <p className="text-xs text-stone-500">{formatDateTime(order.createdAt)}</p>
               </div>

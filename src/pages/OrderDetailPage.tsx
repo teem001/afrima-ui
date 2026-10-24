@@ -112,17 +112,19 @@ export function OrderDetailPage() {
         )}
 
         <ul className="space-y-2 p-4">
-          {o.items.map((item) => (
+          {(o.items ?? []).map((item) => (
             <li key={item.productId} className="flex justify-between gap-4 text-sm">
               <span className="text-stone-700">
                 {item.quantity}× {productName(item.productId)}
               </span>
-              <span className="tabular-nums text-stone-900">{formatKobo(item.unitPriceKobo * item.quantity)}</span>
+              <span className="tabular-nums text-stone-900">
+                {formatKobo((item.unitPriceKobo ?? 0) * (item.quantity ?? 0))}
+              </span>
             </li>
           ))}
           <li className="flex justify-between border-t border-stone-100 pt-2 font-semibold">
             <span>Total</span>
-            <span className="tabular-nums">{formatKobo(o.totalKobo)}</span>
+            <span className="tabular-nums">{formatKobo(o.totalKobo ?? 0)}</span>
           </li>
         </ul>
       </Card>

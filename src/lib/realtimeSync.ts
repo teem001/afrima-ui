@@ -44,7 +44,7 @@ export function useRealtimeSync() {
       if (me?.role === "MERCHANT") {
         useToasts.getState().push({
           title: "New order",
-          body: `${order.items.reduce((n, l) => n + l.quantity, 0)} item(s) · ${formatKobo(order.totalKobo)}`,
+          body: `${(order.items ?? []).reduce((n, l) => n + l.quantity, 0)} item(s) · ${formatKobo(order.totalKobo)}`,
           href: "/merchant",
         });
       }

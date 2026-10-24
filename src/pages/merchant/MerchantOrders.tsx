@@ -73,7 +73,7 @@ export function MerchantOrders({ storeId }: { storeId: string }) {
           <span className="text-xs text-stone-500">{formatDateTime(order.createdAt)}</span>
         </div>
         <p className="text-sm text-stone-800">
-          {order.items.map((i) => `${i.quantity}× ${productName(i.productId)}`).join(", ")}
+          {(order.items ?? []).map((i) => `${i.quantity}× ${productName(i.productId)}`).join(", ")}
         </p>
         <Link to={`/orders/${order.id}`} className="font-mono text-xs text-stone-500 hover:text-emerald-800">
           {shortHash(order.ledgerHash)}
