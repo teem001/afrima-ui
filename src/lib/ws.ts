@@ -49,7 +49,9 @@ const PING_INTERVAL_MS = 25_000;
 const DEFAULT_TIMEOUT_MS = 20_000;
 /** Cold-starting the backend container can take a while; queued requests get longer before giving up. */
 const QUEUE_TIMEOUT_MS = 90_000;
-const MAX_BACKOFF_MS = 10_000;
+/** Longer cap on Vercel so reconnect storms don't wake many cold containers at once. */
+const MAX_BACKOFF_MS = import.meta.env.VITE_WS_URL?.includes("vercel.app") ? 30_000 : 10_000;
+const INITIAL_BACKOFF_MS = import.meta.env.VITE_WS_URL?.includes("vercel.app") ? 2_000 : 500;
 
 function socketUrl(): string {
   const configured = import.meta.env.VITE_WS_URL?.trim();
@@ -78,9 +80,11 @@ class RealtimeClient {
   private sequence = 0;
 
   constructor() {
+    this.backoffMs = INITIAL_BACKOFF_MS;
     window.addEventListener("online", () => this.reconnectNow());
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") this.reconnectNow();
+      // Don't reset backoff — Vercel cold starts need calm retries, not a reconnect storm.
+      if (document.visibilityState === "visible") this.reconnectNow({ resetBackoff: false });
     });
     this.connect();
   }
@@ -149,7 +153,7 @@ class RealtimeClient {
     this.socket = socket;
 
     socket.onopen = () => {
-      this.backoffMs = 500;
+      this.backoffMs = INITIAL_BACKOFF_MS;
       void this.handshake(socket);
     };
     socket.onmessage = (message) => this.receive(message.data);
@@ -251,11 +255,16 @@ class RealtimeClient {
     }, delay);
   }
 
-  private reconnectNow() {
-    if (this.socket || !this.reconnectTimer) return;
-    clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = null;
-    this.backoffMs = 500;
+  private reconnectNow(options: { resetBackoff?: boolean } = {}) {
+    if (this.socket?.readyState === WebSocket.OPEN || this.socket?.readyState === WebSocket.CONNECTING) {
+      return;
+    }
+    if (!this.reconnectTimer && this.socket) return;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (options.resetBackoff !== false) this.backoffMs = INITIAL_BACKOFF_MS;
     this.connect();
   }
 

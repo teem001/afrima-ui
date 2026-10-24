@@ -21,11 +21,21 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 5174 avoids clash with other local Vite apps that often take 5173.
+    port: 5174,
+    strictPort: true,
     proxy: {
       "/ws": {
-        target: "ws://localhost:8087",
+        target: "http://127.0.0.1:8087",
         ws: true,
+        changeOrigin: true,
+      },
+      "/api": {
+        target: "http://127.0.0.1:8087",
+        changeOrigin: true,
+      },
+      "/actuator": {
+        target: "http://127.0.0.1:8087",
         changeOrigin: true,
       },
     },
