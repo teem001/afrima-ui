@@ -76,7 +76,15 @@ export const api = {
   logout: () => call<null>("auth.logout"),
   me: () => call<User>("me"),
 
-  search: (params: { q: string; lat: number; lng: number; radiusMeters?: number }) => call<SearchResponse>("search", params),
+  search: (params: {
+    q: string;
+    lat: number;
+    lng: number;
+    /** Omit to search any store with stock; set to limit by distance (e.g. cart reroute). */
+    radiusMeters?: number | null;
+    page?: number;
+    pageSize?: number;
+  }) => call<SearchResponse>("search", params),
 
   products: () => call<Product[]>("catalog.products"),
   createProduct: (body: CreateProductRequest) => call<Product>("catalog.products.create", body),

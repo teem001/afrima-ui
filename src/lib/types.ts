@@ -49,7 +49,13 @@ export interface SearchResponse {
   query: string;
   latitude: number;
   longitude: number;
-  radiusMeters: number;
+  /** Null when searching all stores (no radius filter). */
+  radiusMeters: number | null;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasMore: boolean;
   resultCount: number;
   minPriceKobo: number | null;
   maxPriceKobo: number | null;

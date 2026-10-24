@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Clock, PackageSearch, Plus, Search } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, PackageSearch, Plus, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { formatDistance, formatKobo } from "@/lib/format";
 import type { NearbyOffer } from "@/lib/types";
@@ -15,6 +15,7 @@ import { OfferMap } from "@/components/OfferMap";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Spinner } from "@/components/ui";
 
 const SUGGESTIONS = ["pack of pens", "rice", "sachet water", "exercise book"];
+const PAGE_SIZE = 20;
 
 function OfferCard({
   offer,
@@ -97,6 +98,7 @@ function OfferCard({
 export function SearchPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q")?.trim() ?? "";
+  const page = Math.max(1, Number(params.get("page")) || 1);
   const [draft, setDraft] = useState(q);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [aiRequest, setAiRequest] = useState<{ query: string; nonce: number } | null>(null);
@@ -105,51 +107,71 @@ export function SearchPage() {
   const locationReady = hasSearchLocation(lat, lng);
 
   const search = useQuery({
-    queryKey: ["search", q, lat, lng, radiusMeters],
-    queryFn: () => api.search({ q, lat: lat!, lng: lng!, radiusMeters }),
+    queryKey: ["search", q, lat, lng, page, PAGE_SIZE],
+    queryFn: () =>
+      api.search({
+        q,
+        lat: lat!,
+        lng: lng!,
+        page,
+        pageSize: PAGE_SIZE,
+        // No radius: any in-stock match from any store, nearest first.
+      }),
     enabled: locationReady && q.length >= 2,
   });
+
+  const setSearchParams = (next: { q?: string; page?: number }) => {
+    const value = (next.q ?? q).trim();
+    const nextPage = next.page ?? 1;
+    const sp: Record<string, string> = {};
+    if (value) sp.q = value;
+    if (value && nextPage > 1) sp.page = String(nextPage);
+    setParams(sp);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const value = draft.trim();
-    setParams(value ? { q: value } : {});
+    setSearchParams({ q: value, page: 1 });
     if (value) askAssistant(value);
   };
 
   const runSuggestion = (s: string) => {
     setDraft(s);
-    setParams({ q: s });
+    setSearchParams({ q: s, page: 1 });
     askAssistant(s);
   };
 
   const askAssistant = (query: string) => setAiRequest((prev) => ({ query, nonce: (prev?.nonce ?? 0) + 1 }));
 
   const offers = search.data?.offers ?? [];
-  const showAiOffers = !!search.data && offers.length === 0 && aiOffers.length > 0;
+  const totalCount = search.data?.totalCount ?? 0;
+  const totalPages = search.data?.totalPages ?? 1;
+  const showAiOffers = !!search.data && totalCount === 0 && aiOffers.length > 0;
   const mapOffers = showAiOffers ? aiOffers : offers;
   const cheapestKobo = search.data?.minPriceKobo ?? null;
-  const nearestKey = offers[0] ? `${offers[0].storeId}:${offers[0].productId}` : null;
+  const nearestKey = page === 1 && offers[0] ? `${offers[0].storeId}:${offers[0].productId}` : null;
 
   const summary = useMemo(() => {
-    if (!search.data || offers.length === 0) return null;
-    const stores = new Set(offers.map((o) => o.storeId)).size;
+    if (!search.data || totalCount === 0) return null;
     const range =
       search.data.minPriceKobo === search.data.maxPriceKobo
         ? formatKobo(search.data.minPriceKobo!)
         : `${formatKobo(search.data.minPriceKobo!)} – ${formatKobo(search.data.maxPriceKobo!)}`;
-    return `${offers.length} offer${offers.length === 1 ? "" : "s"} from ${stores} shop${stores === 1 ? "" : "s"} · ${range}`;
-  }, [search.data, offers]);
+    const from = (search.data.page - 1) * search.data.pageSize + 1;
+    const to = from + offers.length - 1;
+    return `${totalCount} in-stock offer${totalCount === 1 ? "" : "s"} from any shop · ${range} · showing ${from}–${to}`;
+  }, [search.data, offers.length, totalCount]);
 
   return (
     <div className="space-y-6">
       <section className="space-y-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-            Find it nearby, in stock.
+            Find it in stock, anywhere.
           </h1>
           <p className="text-stone-600">
-            Set your location, then compare prices at nearby shops and order from the closest one that has stock.
+            Set your location, then we list every shop that has the item — nearest first — so you can compare and order.
           </p>
         </div>
         <form onSubmit={submit} className="flex gap-2">
@@ -191,24 +213,24 @@ export function SearchPage() {
           {!locationReady && (
             <Card>
               <EmptyState icon={<PackageSearch className="size-10" />} title="Set your location first">
-                Type any place above (or use GPS) so we know where “nearby” is.
+                Type any place above (or use GPS) so we can sort shops by distance.
               </EmptyState>
             </Card>
           )}
           {locationReady && !q && (
             <Card>
               <EmptyState icon={<PackageSearch className="size-10" />} title="Search for something you need">
-                We'll list shops within {formatDistance(radiusMeters)} of {label} that have it in stock, nearest first.
+                We'll list every shop that has it in stock, nearest to {label} first.
               </EmptyState>
             </Card>
           )}
-          {locationReady && q && search.isFetching && !search.data && <Spinner label="Searching nearby shops…" />}
+          {locationReady && q && search.isFetching && !search.data && <Spinner label="Searching all shops…" />}
           {search.isError && <ErrorBanner message={errorMessage(search.error)} />}
           {summary && <p className="text-sm text-stone-600">{summary}</p>}
-          {search.data && offers.length === 0 && !showAiOffers && (
+          {search.data && totalCount === 0 && !showAiOffers && (
             <Card>
-              <EmptyState icon={<PackageSearch className="size-10" />} title={`No shops near ${label} have “${q}” in stock`}>
-                Try a wider radius or a different name for the item.
+              <EmptyState icon={<PackageSearch className="size-10" />} title={`No shop has “${q}” in stock`}>
+                Try a different name for the item.
               </EmptyState>
             </Card>
           )}
@@ -233,12 +255,35 @@ export function SearchPage() {
             <OfferCard
               key={`${offer.storeId}:${offer.productId}`}
               offer={offer}
-              nearest={`${offer.storeId}:${offer.productId}` === nearestKey && offers.length > 1}
-              cheapest={offer.unitPriceKobo === cheapestKobo && offers.length > 1}
+              nearest={`${offer.storeId}:${offer.productId}` === nearestKey && totalCount > 1}
+              cheapest={offer.unitPriceKobo === cheapestKobo && totalCount > 1}
               selected={offer.storeId === selectedStoreId}
               onSelect={() => setSelectedStoreId(offer.storeId)}
             />
           ))}
+          {totalCount > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <Button
+                variant="secondary"
+                className="px-3 py-1.5"
+                disabled={page <= 1 || search.isFetching}
+                onClick={() => setSearchParams({ page: page - 1 })}
+              >
+                <ChevronLeft className="size-4" /> Previous
+              </Button>
+              <p className="text-sm text-stone-600">
+                Page {search.data?.page ?? page} of {totalPages}
+              </p>
+              <Button
+                variant="secondary"
+                className="px-3 py-1.5"
+                disabled={!search.data?.hasMore || search.isFetching}
+                onClick={() => setSearchParams({ page: page + 1 })}
+              >
+                Next <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          )}
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
