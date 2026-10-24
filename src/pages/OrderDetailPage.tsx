@@ -1,12 +1,127 @@
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, CheckCircle2, Copy, ShieldCheck, Wallet as WalletIcon } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Copy, ShieldCheck, Star, Wallet as WalletIcon } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { formatDateTime, formatKobo, formatTime } from "@/lib/format";
 import { useLookups } from "@/lib/lookups";
 import { useAuth } from "@/store/auth";
+import type { ProductReview } from "@/lib/types";
 import { Badge, Button, Card, ErrorBanner, Spinner, StatusBadge } from "@/components/ui";
+
+function StarPicker({
+  value,
+  onChange,
+  readOnly = false,
+}: {
+  value: number;
+  onChange?: (n: number) => void;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-0.5" role={readOnly ? "img" : "group"} aria-label={`${value} of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onChange?.(n)}
+          className={`p-0.5 ${readOnly ? "cursor-default" : "hover:scale-110"}`}
+          aria-label={`${n} star${n === 1 ? "" : "s"}`}
+        >
+          <Star
+            className={`size-5 ${n <= value ? "fill-amber-400 text-amber-500" : "text-stone-300"}`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ProductReviewForm({
+  productId,
+  productLabel,
+  orderId,
+  existing,
+  onSaved,
+}: {
+  productId: string;
+  productLabel: string;
+  orderId: string;
+  existing: ProductReview | null;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(!existing);
+  const [rating, setRating] = useState(existing?.rating ?? 0);
+  const [comment, setComment] = useState(existing?.comment ?? "");
+  const save = useMutation({
+    mutationFn: () =>
+      api.createReview({
+        productId,
+        orderId,
+        rating,
+        comment: comment.trim() || null,
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      onSaved();
+    },
+  });
+
+  if (existing && !editing) {
+    return (
+      <div className="space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium text-stone-900">{productLabel}</p>
+          <StarPicker value={existing.rating} readOnly />
+        </div>
+        {existing.comment && <p className="text-sm text-stone-600">{existing.comment}</p>}
+        <button
+          type="button"
+          className="text-xs font-medium text-emerald-800 hover:underline"
+          onClick={() => {
+            setRating(existing.rating);
+            setComment(existing.comment ?? "");
+            setEditing(true);
+          }}
+        >
+          Edit review
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+      <p className="text-sm font-medium text-stone-900">{productLabel}</p>
+      <StarPicker value={rating} onChange={setRating} />
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Optional comment"
+        rows={2}
+        maxLength={2000}
+        className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 focus:outline-none"
+      />
+      {save.isError && <ErrorBanner message={errorMessage(save.error)} />}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          className="px-3 py-1.5"
+          disabled={rating < 1 || save.isPending}
+          loading={save.isPending}
+          onClick={() => save.mutate()}
+        >
+          {existing ? "Update review" : "Submit review"}
+        </Button>
+        {existing && (
+          <Button variant="ghost" className="px-3 py-1.5" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -55,6 +170,11 @@ export function OrderDetailPage() {
     enabled: order.isSuccess,
     retry: false,
   });
+  const orderReviews = useQuery({
+    queryKey: ["reviews", "order", orderId],
+    queryFn: () => api.orderReviews(orderId),
+    enabled: order.isSuccess && role === "CONSUMER",
+  });
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["orders", orderId] });
@@ -62,6 +182,7 @@ export function OrderDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["wallet"] });
     queryClient.invalidateQueries({ queryKey: ["twin"] });
     queryClient.invalidateQueries({ queryKey: ["verify", orderId] });
+    queryClient.invalidateQueries({ queryKey: ["reviews", "order", orderId] });
   };
   const fulfil = useMutation({ mutationFn: api.fulfilOrder, onSuccess: refresh });
   const cancel = useMutation({ mutationFn: api.cancelOrder, onSuccess: refresh });
@@ -71,6 +192,10 @@ export function OrderDetailPage() {
 
   const o = order.data;
   const shop = store(o.storeId);
+  const canReview = role === "CONSUMER" && o.status !== "CANCELLED";
+  const reviewByProduct = new Map(
+    (orderReviews.data?.items ?? []).map((item) => [item.productId, item.review] as const),
+  );
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -182,6 +307,31 @@ export function OrderDetailPage() {
           )}
         </div>
       </Card>
+
+      {canReview && (
+        <Card className="space-y-3 p-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-stone-900">
+              <Star className="size-4 text-amber-500" /> Rate products
+            </p>
+            <p className="text-sm text-stone-600">Share how these items were — helps other shoppers choose.</p>
+          </div>
+          {orderReviews.isPending && <Spinner label="Loading reviews…" />}
+          {orderReviews.isError && <ErrorBanner message={errorMessage(orderReviews.error)} />}
+          <div className="space-y-3">
+            {(o.items ?? []).map((item) => (
+              <ProductReviewForm
+                key={item.productId}
+                productId={item.productId}
+                productLabel={productName(item.productId)}
+                orderId={o.id}
+                existing={reviewByProduct.get(item.productId) ?? null}
+                onSaved={refresh}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="space-y-2 border-emerald-200 bg-emerald-50/50 p-4">
         <div className="flex items-center justify-between">

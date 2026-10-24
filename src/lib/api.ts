@@ -15,9 +15,12 @@ import type {
   MerchantPayments,
   Order,
   OrderPayment,
+  OrderReviews,
   Payout,
   PlaceOrderRequest,
   Product,
+  ProductReview,
+  ProductReviewSummary,
   RegisterRequest,
   SearchResponse,
   ShopTwin,
@@ -107,6 +110,15 @@ export const api = {
   fulfilOrder: (orderId: string) => call<Order>("orders.fulfil", { orderId }),
   cancelOrder: (orderId: string) => call<Order>("orders.cancel", { orderId }),
   verifyOrder: (orderId: string) => call<VerifyResult>("verify", { orderId }),
+
+  createReview: (body: {
+    productId: string;
+    rating: number;
+    comment?: string | null;
+    orderId?: string | null;
+  }) => call<ProductReview>("reviews.create", body),
+  productReviews: (productId: string) => call<ProductReviewSummary>("reviews.forProduct", { productId }),
+  orderReviews: (orderId: string) => call<OrderReviews>("reviews.forOrder", { orderId }),
 
   wallet: () => call<Wallet>("wallet.me"),
   fundWallet: (amountKobo: number) => call<Wallet>("wallet.fund", { amountKobo }),

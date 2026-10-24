@@ -298,6 +298,31 @@ export interface StockChanged {
   unitPriceKobo: number;
 }
 
+export interface ProductReview {
+  id: string;
+  productId: string;
+  userId: string;
+  orderId: string | null;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+  authorName: string | null;
+  productName: string | null;
+}
+
+export interface ProductReviewSummary {
+  productId: string;
+  count: number;
+  averageRating: number;
+  reviews: ProductReview[];
+}
+
+export interface OrderReviews {
+  orderId: string;
+  items: { productId: string; review: ProductReview | null }[];
+}
+
 export interface AiStatus {
   engine: string;
   configured: boolean;

@@ -208,7 +208,11 @@ export function SearchPage() {
             screen="search"
             searchRequest={aiRequest}
             onOffers={setAiOffers}
-            suggestions={["Cheapest rice near me?", "Which shop is open now with sachet water?"]}
+            suggestions={[
+              "Order the cheapest rice for me",
+              "Which shop is open now with sachet water?",
+              "Add ₦5,000 to my wallet",
+            ]}
           />
           {!locationReady && (
             <Card>

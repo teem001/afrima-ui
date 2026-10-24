@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, CircleAlert, Loader2, RotateCcw, Send, Sparkles } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { formatKobo } from "@/lib/format";
@@ -11,7 +11,7 @@ import { useSearchPrefs } from "@/store/searchPrefs";
 import { Button, Card } from "@/components/ui";
 
 const TOOL_LABELS: Record<string, string> = {
-  SEARCH_PRODUCTS_NEARBY: "Searching nearby shops",
+  SEARCH_PRODUCTS_NEARBY: "Searching shops with stock",
   COMPARE_PRICES: "Comparing prices",
   FIND_ALTERNATIVE_STORES: "Finding other shops",
   GET_STORE_DETAILS: "Checking the shop",
@@ -22,7 +22,20 @@ const TOOL_LABELS: Record<string, string> = {
   GET_INCOMING_ORDERS: "Checking incoming orders",
   UPDATE_STOCK: "Updating stock",
   GET_MY_WALLET: "Checking your wallet",
+  FUND_WALLET: "Adding demo funds",
+  SUBMIT_PRODUCT_REVIEW: "Saving your review",
+  GET_PRODUCT_REVIEWS: "Reading reviews",
 };
+
+function ordersFromTools(tools: ToolExecution[]): { orderId: string; total?: string }[] {
+  const out: { orderId: string; total?: string }[] = [];
+  for (const call of tools) {
+    if (call.tool !== "PLACE_ORDER" || !call.result.success) continue;
+    const data = call.result.data as { orderId?: string; total?: string } | undefined;
+    if (data?.orderId) out.push({ orderId: data.orderId, total: data.total });
+  }
+  return out;
+}
 
 const toolLabel = (tool: string) => TOOL_LABELS[tool] ?? tool.toLowerCase().replaceAll("_", " ");
 
@@ -91,6 +104,7 @@ export function AssistantPanel({
   title?: string;
 }) {
   const user = useAuth((s) => s.user);
+  const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ["ai", "status"], queryFn: api.aiStatus, staleTime: 60_000 });
   const [turns, setTurns] = useState<Turn[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -158,6 +172,15 @@ export function AssistantPanel({
       ]);
       const offers = offersFromTools(response.toolCalls);
       if (offers.length) onOffersRef.current?.(offers);
+      if (ordersFromTools(response.toolCalls).length) {
+        void queryClient.invalidateQueries({ queryKey: ["orders"] });
+        void queryClient.invalidateQueries({ queryKey: ["wallet"] });
+        void queryClient.invalidateQueries({ queryKey: ["search"] });
+        void queryClient.invalidateQueries({ queryKey: ["payments"] });
+      }
+      if (response.toolCalls.some((t) => t.tool === "SUBMIT_PRODUCT_REVIEW" && t.result.success)) {
+        void queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      }
     } catch (e) {
       if (generation.current !== run) return;
       if (e instanceof ApiError && e.code === "AI_NOT_CONFIGURED") setOffline(true);
@@ -240,7 +263,7 @@ export function AssistantPanel({
               <div className="space-y-3 text-sm text-stone-500">
                 <p>
                   {screen === "search"
-                    ? "Search above and I'll pick the best shop for you — or ask me anything about what's nearby."
+                    ? "Search above and I'll pick the best shop — say “order it” and I'll place it after you confirm. You can also leave product reviews after buying."
                     : "Ask about your stock, sales or incoming orders. I can update stock for you too."}
                 </p>
                 {suggestions.length > 0 && (
@@ -270,6 +293,16 @@ export function AssistantPanel({
                   <Bot className="mt-1 size-4 shrink-0 text-amber-600" />
                   <div className="min-w-0 space-y-1.5">
                     <p className="text-sm whitespace-pre-wrap text-stone-800">{turn.text}</p>
+                    {turn.tools && ordersFromTools(turn.tools).map((order) => (
+                      <Link
+                        key={order.orderId}
+                        to={`/orders/${order.orderId}`}
+                        state={{ justPlaced: true }}
+                        className="inline-flex text-sm font-medium text-emerald-800 hover:underline"
+                      >
+                        View order{order.total ? ` · ₦${order.total}` : ""} →
+                      </Link>
+                    ))}
                     {turn.tools && turn.tools.length > 0 && (
                       <p className="text-xs text-stone-400">
                         Used: {[...new Set(turn.tools.map((t) => toolLabel(t.tool).toLowerCase()))].join(", ")}
