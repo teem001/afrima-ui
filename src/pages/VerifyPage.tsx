@@ -1,12 +1,21 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck, CircleAlert, Fingerprint, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { Badge, Button, Card, ErrorBanner, Spinner } from "@/components/ui";
 
 export function VerifyPage() {
-  const [draft, setDraft] = useState("");
-  const [orderId, setOrderId] = useState("");
+  const [params, setParams] = useSearchParams();
+  const fromUrl = (params.get("orderId") || "").trim();
+  const [draft, setDraft] = useState(fromUrl);
+  const [orderId, setOrderId] = useState(fromUrl);
+
+  useEffect(() => {
+    const next = (params.get("orderId") || "").trim();
+    setDraft(next);
+    setOrderId(next);
+  }, [params]);
 
   const verify = useQuery({
     queryKey: ["verify", orderId],
@@ -17,7 +26,10 @@ export function VerifyPage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    setOrderId(draft.trim());
+    const id = draft.trim();
+    setOrderId(id);
+    if (id) setParams({ orderId: id });
+    else setParams({});
   };
 
   const data = verify.data;

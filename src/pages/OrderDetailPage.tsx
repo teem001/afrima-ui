@@ -200,7 +200,10 @@ export function OrderDetailPage() {
             Anchored · {verify.data.txReference} · proof {verify.data.proofValid ? "valid" : "invalid"}
           </Badge>
         )}
-        <Link to="/verify" className="block text-xs font-medium text-emerald-800 hover:underline">
+        <Link
+          to={`/verify?orderId=${encodeURIComponent(o.id)}`}
+          className="block text-xs font-medium text-emerald-800 hover:underline"
+        >
           Verify this receipt →
         </Link>
       </Card>
