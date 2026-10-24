@@ -69,7 +69,7 @@ export function WalletPage() {
         {fund.isError && <p className="text-sm text-amber-200">{errorMessage(fund.error)}</p>}
       </Card>
 
-      {role === "CONSUMER" && twin.data && (
+      {role === "CONSUMER" && twin.data?.escrow && (
         <Card className="space-y-3 p-4">
           <p className="flex items-center gap-1.5 font-semibold text-stone-900">
             <ShieldCheck className="size-4 text-emerald-700" /> Your activity snapshot
@@ -77,16 +77,16 @@ export function WalletPage() {
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <div>
               <p className="text-stone-500">In escrow</p>
-              <p className="font-semibold tabular-nums">{formatKobo(twin.data.escrow.inEscrowKobo)}</p>
-              <p className="text-xs text-stone-500">{twin.data.escrow.heldOrders} order(s) held</p>
+              <p className="font-semibold tabular-nums">{formatKobo(twin.data.escrow.inEscrowKobo ?? 0)}</p>
+              <p className="text-xs text-stone-500">{twin.data.escrow.heldOrders ?? 0} order(s) held</p>
             </div>
             <div>
               <p className="text-stone-500">Orders</p>
-              <p className="font-semibold tabular-nums">{twin.data.ordersCount}</p>
+              <p className="font-semibold tabular-nums">{twin.data.ordersCount ?? 0}</p>
             </div>
             <div>
               <p className="text-stone-500">Total spent</p>
-              <p className="font-semibold tabular-nums">{formatKobo(twin.data.totalSpentKobo)}</p>
+              <p className="font-semibold tabular-nums">{formatKobo(twin.data.totalSpentKobo ?? 0)}</p>
             </div>
             <div>
               <p className="flex items-center gap-1 text-stone-500">
@@ -111,21 +111,21 @@ export function WalletPage() {
         <Card className="grid grid-cols-2 gap-3 p-4 text-sm sm:grid-cols-4">
           <div>
             <p className="text-stone-500">In escrow</p>
-            <p className="font-semibold tabular-nums">{formatKobo(summary.data.inEscrowKobo)}</p>
+            <p className="font-semibold tabular-nums">{formatKobo(summary.data.inEscrowKobo ?? 0)}</p>
           </div>
           <div>
             <p className="text-stone-500">Earned (gross)</p>
-            <p className="font-semibold tabular-nums">{formatKobo(summary.data.releasedGrossKobo)}</p>
+            <p className="font-semibold tabular-nums">{formatKobo(summary.data.releasedGrossKobo ?? 0)}</p>
           </div>
           <div>
             <p className="text-stone-500">Commission (5%)</p>
-            <p className="font-semibold tabular-nums">{formatKobo(summary.data.commissionKobo)}</p>
+            <p className="font-semibold tabular-nums">{formatKobo(summary.data.commissionKobo ?? 0)}</p>
           </div>
           <div>
             <p className="flex items-center gap-1 text-stone-500">
               <Landmark className="size-3.5" /> Paid out
             </p>
-            <p className="font-semibold tabular-nums">{formatKobo(summary.data.paidOutKobo)}</p>
+            <p className="font-semibold tabular-nums">{formatKobo(summary.data.paidOutKobo ?? 0)}</p>
           </div>
         </Card>
       )}
