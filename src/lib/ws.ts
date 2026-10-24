@@ -181,7 +181,8 @@ class RealtimeClient {
           timeoutMs: DEFAULT_TIMEOUT_MS,
           resolve: () => resolve(),
           reject: (error) => {
-            if (error.status === 401) useAuth.getState().logout();
+            // Memory DB restarts wipe users while the JWT remains in localStorage.
+            if (error.status === 401 || error.status === 404) useAuth.getState().logout();
             resolve();
           },
           timer,

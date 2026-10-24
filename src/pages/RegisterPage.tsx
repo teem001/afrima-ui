@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { ShoppingBag, Store } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { useConnection } from "@/lib/ws";
 import type { Role } from "@/lib/types";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
 import { useAuthRedirect } from "@/pages/LoginPage";
@@ -16,6 +17,7 @@ export function RegisterPage() {
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", password: "", role: "CONSUMER" as Role });
   const onAuthenticated = useAuthRedirect();
   const location = useLocation();
+  const live = useConnection((s) => s.status) === "open";
 
   const register = useMutation({ mutationFn: api.register, onSuccess: onAuthenticated });
 
@@ -35,6 +37,11 @@ export function RegisterPage() {
           Start from scratch — register, set your location, then shop or create a shop. Light data only.
         </p>
       </div>
+      {!live && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Wait for <strong>Live</strong> in the header before creating an account (server may be cold-starting).
+        </p>
+      )}
       <Card className="p-6">
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2">

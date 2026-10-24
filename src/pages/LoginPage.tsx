@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, errorMessage } from "@/lib/api";
+import { useConnection } from "@/lib/ws";
 import type { AuthResponse } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
@@ -26,6 +27,14 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const onAuthenticated = useAuthRedirect();
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = useAuth((s) => s.user);
+  const conn = useConnection((s) => s.status);
+  const live = conn === "open";
+
+  useEffect(() => {
+    if (user) navigate(user.role === "MERCHANT" ? "/merchant" : "/", { replace: true });
+  }, [user, navigate]);
 
   const login = useMutation({ mutationFn: api.login, onSuccess: onAuthenticated });
 
@@ -39,9 +48,16 @@ export function LoginPage() {
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
         <p className="text-sm text-stone-600">
-          Sign in with the account you registered — several people can use AfriSmart at once on their own devices.
+          Sign in with the account you registered on this deployment. If the API just woke up with an empty memory DB,
+          create a new account instead.
         </p>
       </div>
+      {!live && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Server is waking (common on Vercel after idle). Wait until the badge says <strong>Live</strong>, then sign in
+          or register. First wake can take 15–40 seconds.
+        </p>
+      )}
       <Card className="p-6">
         <form onSubmit={submit} className="space-y-4">
           <Field label="Email">
@@ -57,17 +73,16 @@ export function LoginPage() {
             />
           </Field>
           {login.isError && <ErrorBanner message={errorMessage(login.error)} />}
-          <Button type="submit" className="w-full" loading={login.isPending}>
+          <Button type="submit" className="w-full" loading={login.isPending} disabled={!live && login.isPending}>
             Sign in
           </Button>
         </form>
       </Card>
       <p className="text-center text-sm text-stone-600">
-        New here?{" "}
+        New here or login failed after a restart?{" "}
         <Link to="/register" state={location.state} className="font-medium text-emerald-800 hover:underline">
           Create an account
-        </Link>{" "}
-        and start from scratch — no seeded shops required.
+        </Link>
       </p>
     </div>
   );
