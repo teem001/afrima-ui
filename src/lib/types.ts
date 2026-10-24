@@ -43,10 +43,15 @@ export interface NearbyOffer {
   unitPrice: string;
   currency: string;
   distanceMeters: number;
+  categoryId?: string | null;
+  categorySlug?: string | null;
+  categoryName?: string | null;
 }
 
 export interface SearchResponse {
   query: string;
+  categoryId?: string | null;
+  categorySlug?: string | null;
   latitude: number;
   longitude: number;
   /** Null when searching all stores (no radius filter). */
@@ -64,6 +69,13 @@ export interface SearchResponse {
   offers: NearbyOffer[];
 }
 
+export interface ProductCategory {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -72,6 +84,9 @@ export interface Product {
   aliases: string[];
   imageMediaId: string | null;
   imageUrl: string | null;
+  categoryId?: string;
+  categorySlug?: string;
+  categoryName?: string;
 }
 
 export interface CreateProductRequest {
@@ -80,6 +95,45 @@ export interface CreateProductRequest {
   description?: string | null;
   aliases?: string[];
   imageMediaId?: string | null;
+  categoryId?: string | null;
+  categorySlug?: string | null;
+}
+
+export interface ShopperProfile {
+  userId: string;
+  topCategories: { categoryId: string; count: number; name: string | null }[];
+  topProducts: { productId: string; count: number; name: string | null }[];
+  priceBand: {
+    minKobo: number | null;
+    p50Kobo: number | null;
+    maxKobo: number | null;
+    min: string | null;
+    p50: string | null;
+    max: string | null;
+  };
+  preferredRadiusM: number | null;
+  preferredLocation: { lat: number; lng: number } | null;
+  orderCount: number;
+  avgOrderKobo: number | null;
+  avgOrder: string | null;
+  orderFrequencyDays: number | null;
+  discountSensitivity: number;
+  aiReview: string | null;
+  aiReviewAt: string | null;
+  recentSearches: { query: string; createdAt: string }[];
+  updatedAt: string | null;
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  href: string | null;
+  payload: unknown;
+  readAt: string | null;
+  createdAt: string;
 }
 
 export interface Store {
@@ -336,8 +390,15 @@ export interface AiClientContext {
   radiusMeters?: number;
   storeName?: string;
   cart?: {
+    storeId?: string;
     storeName?: string;
-    items: { productName: string; quantity: number; unitPrice: string }[];
+    items: {
+      productId?: string;
+      productName: string;
+      quantity: number;
+      unitPrice: string;
+      unitPriceKobo?: number;
+    }[];
   };
 }
 

@@ -98,6 +98,7 @@ function OfferCard({
 export function SearchPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q")?.trim() ?? "";
+  const categorySlug = params.get("category")?.trim() || "";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const [draft, setDraft] = useState(q);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -106,40 +107,52 @@ export function SearchPage() {
   const { lat, lng, radiusMeters, label } = useSearchPrefs();
   const locationReady = hasSearchLocation(lat, lng);
 
+  const categories = useQuery({ queryKey: ["catalog", "categories"], queryFn: api.categories, staleTime: 300_000 });
+
+  const searchEnabled = locationReady && (q.length >= 2 || !!categorySlug);
+
   const search = useQuery({
-    queryKey: ["search", q, lat, lng, page, PAGE_SIZE],
+    queryKey: ["search", q, categorySlug, lat, lng, page, PAGE_SIZE],
     queryFn: () =>
       api.search({
-        q,
+        q: q || undefined,
+        categorySlug: categorySlug || undefined,
         lat: lat!,
         lng: lng!,
         page,
         pageSize: PAGE_SIZE,
-        // No radius: any in-stock match from any store, nearest first.
       }),
-    enabled: locationReady && q.length >= 2,
+    enabled: searchEnabled,
   });
 
-  const setSearchParams = (next: { q?: string; page?: number }) => {
+  const setSearchParams = (next: { q?: string; page?: number; category?: string | null }) => {
     const value = (next.q ?? q).trim();
+    const cat = next.category === undefined ? categorySlug : next.category?.trim() || "";
     const nextPage = next.page ?? 1;
     const sp: Record<string, string> = {};
     if (value) sp.q = value;
-    if (value && nextPage > 1) sp.page = String(nextPage);
+    if (cat) sp.category = cat;
+    if ((value || cat) && nextPage > 1) sp.page = String(nextPage);
     setParams(sp);
   };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const value = draft.trim();
-    setSearchParams({ q: value, page: 1 });
+    setSearchParams({ q: value, page: 1, category: null });
     if (value) askAssistant(value);
   };
 
   const runSuggestion = (s: string) => {
     setDraft(s);
-    setSearchParams({ q: s, page: 1 });
+    setSearchParams({ q: s, page: 1, category: null });
     askAssistant(s);
+  };
+
+  const runCategory = (slug: string, name: string) => {
+    setDraft("");
+    setSearchParams({ q: "", page: 1, category: slug });
+    askAssistant(`Suggest something in ${name}`);
   };
 
   const askAssistant = (query: string) => setAiRequest((prev) => ({ query, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -200,6 +213,26 @@ export function SearchPage() {
             </button>
           ))}
         </div>
+        {categories.data && categories.data.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {categories.data
+              .filter((c) => c.slug !== "other")
+              .map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => runCategory(c.slug, c.name)}
+                  className={`rounded-full px-3 py-1 text-sm ${
+                    categorySlug === c.slug
+                      ? "bg-emerald-700 text-white"
+                      : "border border-stone-200 bg-white text-stone-700 hover:border-emerald-600 hover:text-emerald-800"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+          </div>
+        )}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -210,8 +243,8 @@ export function SearchPage() {
             onOffers={setAiOffers}
             suggestions={[
               "Order the cheapest rice for me",
-              "Which shop is open now with sachet water?",
-              "Add ₦5,000 to my wallet",
+              "Suggest something in beverages",
+              "What do I usually buy?",
             ]}
           />
           {!locationReady && (
@@ -221,20 +254,27 @@ export function SearchPage() {
               </EmptyState>
             </Card>
           )}
-          {locationReady && !q && (
+          {locationReady && !q && !categorySlug && (
             <Card>
               <EmptyState icon={<PackageSearch className="size-10" />} title="Search for something you need">
-                We'll list every shop that has it in stock, nearest to {label} first.
+                We'll list every shop that has it in stock, nearest to {label} first. Or pick a category above.
               </EmptyState>
             </Card>
           )}
-          {locationReady && q && search.isFetching && !search.data && <Spinner label="Searching all shops…" />}
+          {locationReady && searchEnabled && search.isFetching && !search.data && (
+            <Spinner label="Searching all shops…" />
+          )}
           {search.isError && <ErrorBanner message={errorMessage(search.error)} />}
           {summary && <p className="text-sm text-stone-600">{summary}</p>}
           {search.data && totalCount === 0 && !showAiOffers && (
             <Card>
-              <EmptyState icon={<PackageSearch className="size-10" />} title={`No shop has “${q}” in stock`}>
-                Try a different name for the item.
+              <EmptyState
+                icon={<PackageSearch className="size-10" />}
+                title={
+                  q ? `No shop has “${q}” in stock` : `No in-stock items in this category yet`
+                }
+              >
+                Try a different name or category.
               </EmptyState>
             </Card>
           )}

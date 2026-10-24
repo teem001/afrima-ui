@@ -15,7 +15,10 @@ const TOOL_LABELS: Record<string, string> = {
   COMPARE_PRICES: "Comparing prices",
   FIND_ALTERNATIVE_STORES: "Finding other shops",
   GET_STORE_DETAILS: "Checking the shop",
+  LIST_CATEGORIES: "Listing categories",
+  SEARCH_BY_CATEGORY: "Browsing a category",
   PLACE_ORDER: "Placing the order",
+  PLACE_CART_ORDER: "Ordering your cart",
   GET_MY_ORDERS: "Looking up your orders",
   GET_MY_INVENTORY: "Reading your inventory",
   GET_LOW_STOCK_ITEMS: "Checking what's running low",
@@ -25,12 +28,20 @@ const TOOL_LABELS: Record<string, string> = {
   FUND_WALLET: "Adding demo funds",
   SUBMIT_PRODUCT_REVIEW: "Saving your review",
   GET_PRODUCT_REVIEWS: "Reading reviews",
+  GET_SHOPPER_PROFILE: "Reading your shopping profile",
+  REFRESH_SHOPPER_REVIEW: "Refreshing your AI review",
 };
+
+const CONFIRM_CHIPS = [
+  "Yes, order the nearest one",
+  "Order my cart",
+  "Add ₦5,000 then order",
+];
 
 function ordersFromTools(tools: ToolExecution[]): { orderId: string; total?: string }[] {
   const out: { orderId: string; total?: string }[] = [];
   for (const call of tools) {
-    if (call.tool !== "PLACE_ORDER" || !call.result.success) continue;
+    if ((call.tool !== "PLACE_ORDER" && call.tool !== "PLACE_CART_ORDER") || !call.result.success) continue;
     const data = call.result.data as { orderId?: string; total?: string } | undefined;
     if (data?.orderId) out.push({ orderId: data.orderId, total: data.total });
   }
@@ -76,11 +87,14 @@ function clientContext(screen: string, searchQuery?: string, storeName?: string)
     radiusMeters: prefs.radiusMeters,
     cart: cart.lines.length
       ? {
+          storeId: cart.store?.storeId,
           storeName: cart.store?.storeName,
           items: cart.lines.slice(0, 20).map((l) => ({
+            productId: l.productId,
             productName: l.productName,
             quantity: l.quantity,
             unitPrice: formatKobo(l.unitPriceKobo),
+            unitPriceKobo: l.unitPriceKobo,
           })),
         }
       : undefined,
@@ -177,9 +191,19 @@ export function AssistantPanel({
         void queryClient.invalidateQueries({ queryKey: ["wallet"] });
         void queryClient.invalidateQueries({ queryKey: ["search"] });
         void queryClient.invalidateQueries({ queryKey: ["payments"] });
+        void queryClient.invalidateQueries({ queryKey: ["prefs"] });
+        useCart.getState().clear();
       }
       if (response.toolCalls.some((t) => t.tool === "SUBMIT_PRODUCT_REVIEW" && t.result.success)) {
         void queryClient.invalidateQueries({ queryKey: ["reviews"] });
+        void queryClient.invalidateQueries({ queryKey: ["prefs"] });
+      }
+      if (
+        response.toolCalls.some(
+          (t) => (t.tool === "REFRESH_SHOPPER_REVIEW" || t.tool === "GET_SHOPPER_PROFILE") && t.result.success,
+        )
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ["prefs"] });
       }
     } catch (e) {
       if (generation.current !== run) return;
@@ -196,7 +220,9 @@ export function AssistantPanel({
   const nonce = searchRequest?.nonce;
   useEffect(() => {
     if (!searchRequest || !user || status.data?.configured === false) return;
-    void send(searchRequest.query, { fresh: true, searchQuery: searchRequest.query });
+    // Keep conversation continuity so “order it” on the next turn still has tool ids.
+    const fresh = !conversationId;
+    void send(searchRequest.query, { fresh, searchQuery: searchRequest.query });
     // Only a new submit (nonce) should trigger a chat, not re-renders or status refetches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nonce, user?.id]);
@@ -334,6 +360,20 @@ export function AssistantPanel({
               </ul>
             )}
             {error && <p className="text-sm text-red-700">{error}</p>}
+            {screen === "search" && turns.length > 0 && !busy && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {CONFIRM_CHIPS.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => void send(chip)}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900 hover:border-emerald-600"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <form onSubmit={submit} className="flex gap-2 border-t border-stone-100 p-3">
             <input

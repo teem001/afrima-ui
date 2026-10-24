@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackagePlus } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { nairaToKobo } from "@/lib/format";
@@ -8,10 +8,12 @@ import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
 
 export function CreateProductForm({ storeId, onDone }: { storeId: string; onDone?: () => void }) {
   const queryClient = useQueryClient();
+  const categories = useQuery({ queryKey: ["catalog", "categories"], queryFn: api.categories, staleTime: 300_000 });
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sku, setSku] = useState("");
   const [aliases, setAliases] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [quantity, setQuantity] = useState("10");
   const [price, setPrice] = useState("");
   const [imageMediaId, setImageMediaId] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export function CreateProductForm({ storeId, onDone }: { storeId: string; onDone
           .map((a) => a.trim())
           .filter(Boolean),
         imageMediaId,
+        categoryId: categoryId || null,
       });
       await api.upsertInventory(storeId, {
         productId: product.id,
@@ -45,6 +48,7 @@ export function CreateProductForm({ storeId, onDone }: { storeId: string; onDone
       setDescription("");
       setSku("");
       setAliases("");
+      setCategoryId("");
       setQuantity("10");
       setPrice("");
       setImageMediaId(null);
@@ -104,6 +108,20 @@ export function CreateProductForm({ storeId, onDone }: { storeId: string; onDone
         </div>
         <Field label="Search aliases (comma-separated)">
           <Input value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder="biro, pens" />
+        </Field>
+        <Field label="Category">
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 focus:outline-none"
+          >
+            <option value="">Other</option>
+            {(categories.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Quantity on shelf">

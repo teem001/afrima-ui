@@ -10,6 +10,7 @@ import { OrdersPage } from "@/pages/OrdersPage";
 import { OrderDetailPage } from "@/pages/OrderDetailPage";
 import { WalletPage } from "@/pages/WalletPage";
 import { VerifyPage } from "@/pages/VerifyPage";
+import { ProfilePage } from "@/pages/ProfilePage";
 import { MerchantPage } from "@/pages/merchant/MerchantPage";
 
 function Home() {
@@ -31,6 +32,14 @@ export function App() {
           element={
             <RequireRole>
               <WalletPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <RequireRole role="CONSUMER">
+              <ProfilePage />
             </RequireRole>
           }
         />

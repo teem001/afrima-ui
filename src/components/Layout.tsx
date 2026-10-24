@@ -1,9 +1,10 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Fingerprint, LogOut, MapPin, ShoppingBag, Store, Wallet as WalletIcon } from "lucide-react";
+import { Brain, Fingerprint, LogOut, MapPin, ShoppingBag, Store, Wallet as WalletIcon } from "lucide-react";
 import { useRealtimeSync } from "@/lib/realtimeSync";
 import { useAuth } from "@/store/auth";
 import { useCart } from "@/store/cart";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Toasts } from "@/components/Toasts";
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -44,6 +45,13 @@ export function Layout() {
                 My orders
               </NavLink>
             )}
+            {user?.role === "CONSUMER" && (
+              <NavLink to="/profile" className={navClass}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Brain className="size-4" /> Profile
+                </span>
+              </NavLink>
+            )}
             {user && (
               <NavLink to="/wallet" className={navClass}>
                 <span className="inline-flex items-center gap-1.5">
@@ -67,6 +75,7 @@ export function Layout() {
 
           <div className="ml-auto flex items-center gap-2">
             <ConnectionBadge />
+            <NotificationBell />
             {user?.role !== "MERCHANT" && (
               <Link
                 to="/cart"

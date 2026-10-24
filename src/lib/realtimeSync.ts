@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { realtime } from "@/lib/ws";
 import { formatKobo } from "@/lib/format";
-import type { Order, StockChanged } from "@/lib/types";
+import type { AppNotification, Order, StockChanged } from "@/lib/types";
 import { useAuth } from "@/store/auth";
 import { useToasts } from "@/store/toasts";
 
@@ -75,6 +75,16 @@ export function useRealtimeSync() {
       }, 300);
     });
 
+    const offNotif = realtime.on("notification.created", (data) => {
+      const n = data as AppNotification;
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      useToasts.getState().push({
+        title: n.title,
+        body: n.body,
+        href: n.href ?? undefined,
+      });
+    });
+
     // Pushes sent while we were offline are lost, so catch up after a reconnect.
     let firstOpen = true;
     const offOpen = realtime.on("connection.open", () => {
@@ -89,6 +99,7 @@ export function useRealtimeSync() {
       offPlaced();
       offUpdated();
       offStock();
+      offNotif();
       offOpen();
       if (stockTimer) clearTimeout(stockTimer);
     };

@@ -6,6 +6,7 @@ import type {
   AiChatResponse,
   AiProgress,
   AiStatus,
+  AppNotification,
   AuthResponse,
   CreateProductRequest,
   CustomerTwin,
@@ -19,10 +20,12 @@ import type {
   Payout,
   PlaceOrderRequest,
   Product,
+  ProductCategory,
   ProductReview,
   ProductReviewSummary,
   RegisterRequest,
   SearchResponse,
+  ShopperProfile,
   ShopTwin,
   Simulation,
   Store,
@@ -80,16 +83,19 @@ export const api = {
   me: () => call<User>("me"),
 
   search: (params: {
-    q: string;
+    q?: string;
     lat: number;
     lng: number;
     /** Omit to search any store with stock; set to limit by distance (e.g. cart reroute). */
     radiusMeters?: number | null;
     page?: number;
     pageSize?: number;
+    categoryId?: string | null;
+    categorySlug?: string | null;
   }) => call<SearchResponse>("search", params),
 
   products: () => call<Product[]>("catalog.products"),
+  categories: () => call<ProductCategory[]>("catalog.categories"),
   createProduct: (body: CreateProductRequest) => call<Product>("catalog.products.create", body),
   stores: () => call<Store[]>("stores.list"),
   myStores: () => call<Store[]>("stores.mine"),
@@ -119,6 +125,32 @@ export const api = {
   }) => call<ProductReview>("reviews.create", body),
   productReviews: (productId: string) => call<ProductReviewSummary>("reviews.forProduct", { productId }),
   orderReviews: (orderId: string) => call<OrderReviews>("reviews.forOrder", { orderId }),
+
+  shopperProfile: () => call<ShopperProfile>("prefs.me"),
+  refreshShopperReview: () => call<ShopperProfile>("prefs.aiReview"),
+
+  notifications: () => call<AppNotification[]>("notifications.list"),
+  notificationsUnread: () => call<{ count: number }>("notifications.unreadCount"),
+  markNotificationsRead: (notificationId?: string | null) =>
+    call<{ count: number }>("notifications.markRead", { notificationId: notificationId ?? null }),
+  notificationSubscriptions: () =>
+    call<
+      {
+        id: string;
+        categoryId: string | null;
+        categoryName: string | null;
+        categorySlug: string | null;
+        query: string | null;
+        maxPriceKobo: number | null;
+        active: boolean;
+        createdAt: string;
+      }[]
+    >("notifications.subscriptions"),
+  subscribeNotification: (body: {
+    categoryId?: string | null;
+    query?: string | null;
+    maxPriceKobo?: number | null;
+  }) => call<unknown>("notifications.subscribe", body),
 
   wallet: () => call<Wallet>("wallet.me"),
   fundWallet: (amountKobo: number) => call<Wallet>("wallet.fund", { amountKobo }),
