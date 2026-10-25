@@ -35,8 +35,8 @@ const TOOL_LABELS: Record<string, string> = {
 
 const CONFIRM_CHIPS = [
   "Yes, order the nearest one",
-  "Order my cart",
-  "Add ₦5,000 then order",
+  "Order my cart now",
+  "Add ₦5,000 then order my cart",
 ];
 
 function ordersFromTools(tools: ToolExecution[]): { orderId: string; total?: string }[] {
